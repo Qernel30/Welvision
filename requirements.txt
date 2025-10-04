@@ -1,0 +1,7 @@
+opencv-python
+Pillow
+numpy
+ultralytics
+python-snap7
+torch @ https://download.pytorch.org/whl/cu129/torch-1.13.1+cu129-cp39-cp39-linux_x86_64.whl
+torchvision @ https://download.pytorch.org/whl/cu129/torchvision-0.14.1+cu129-cp39-cp39-linux_x86_64.whl
