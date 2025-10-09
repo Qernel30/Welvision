@@ -6,14 +6,17 @@ import numpy as np
 import os
 from ultralytics import YOLO
 import torch
+from backend.image_manager import save_defect_image, save_all_frames_image
 
 
 def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_queue_bigface, model_bigface_path, proximity_count_bigface, roller_updation_dict, queue_lock, shared_data, frame_shape, shared_annotated_bigface, annotated_frame_lock_bigface):
     """Process frames for YOLO inference."""
-    detected_folder = "captured_bigface_frames"
-    os.makedirs(detected_folder, exist_ok=True)
-    head_folder="captured_head_frames"
-    os.makedirs(head_folder, exist_ok=True)
+    
+    # Get configuration from shared_data
+    storage_paths = shared_data.get('image_storage_paths', {})
+    image_limit = shared_data.get('image_limit', 10000)
+    warmup_images = shared_data.get('warmup_images', {})
+    
     bf_triggered = False
     roller_dict = {}
     previous_head_status = False
@@ -37,7 +40,8 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
         
     class_names = model_bf.names
 
-    warmup_frame = r"assets//images//Warmup BF.jpg"
+    # Load warmup frame from config
+    warmup_frame = warmup_images.get('BIGFACE', r"assets//images//Warmup BF.jpg")
     try:
         for i in range(30):  # Process 30 warmup frames
             results = model_bf.predict(warmup_frame, device=0, conf=1, verbose=False)
@@ -78,6 +82,9 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
     latest_min = 180
     latest_max = 240
     frame_number_head = 0
+
+    # Check if allow_all_images is enabled
+    allow_all = shared_data.get('allow_all_images', False)
     
     while True:
         
@@ -141,9 +148,17 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
             cv2.putText(annotated_frame, distance_text, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             
             frame_number_head += 1
-            annotated_frame = results[0].plot()
-            save_path = f"{head_folder}/frame{frame_number_head}.jpg"
-            cv2.imwrite(save_path, annotated_frame)
+            
+            # Check if allow_all_images is enabled
+            allow_all = shared_data.get('allow_all_images', False)
+            
+            if allow_all:
+                # Save all head frames
+                save_all_frames_image(annotated_frame, 'BF', frame_number_head, storage_paths, is_head=True, max_images=image_limit)
+            
+            # Always save head defect frames
+            if head_type == "High Head" or head_type == "Down Head":
+                save_defect_image(annotated_frame, 'BF', frame_number_head, storage_paths, is_head_defect=True, max_images=image_limit)
     
 
         previous_head_status = current_head_state
@@ -185,8 +200,7 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
             if len(detections) > 0:
                 frame_number += 1
                 annotated_frame = results[0].plot()
-                save_path = f"{detected_folder}/frame{frame_number}.jpg"
-                cv2.imwrite(save_path, annotated_frame)
+                
                 
                 with annotated_frame_lock_bigface:
                     np_annotated = np.frombuffer(shared_annotated_bigface.get_obj(), dtype=np.uint8).reshape(frame_shape)
@@ -194,6 +208,17 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
 
                 roller_only_sorted = [detection for detection in detections if detection[0] == "roller" and detection[-1] > 0.80]
                 defect_only_sorted = [detection for detection in detections if detection[0] != "roller"]
+
+                # Check if there are any defects
+                has_defects = len(defect_only_sorted) > 0
+                
+                # Save based on mode
+                if allow_all:
+                    # Save all frames (with or without defects)
+                    save_all_frames_image(annotated_frame, 'BF', frame_number, storage_paths, is_head=False, max_images=image_limit)
+                elif has_defects:
+                    # Only save frames with defects
+                    save_defect_image(annotated_frame, 'BF', frame_number, storage_paths, is_head_defect=False, max_images=image_limit)
 
 
                 for detection in defect_only_sorted:
@@ -237,8 +262,10 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
 def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_lock, shared_data, frame_shape, roller_updation_dict, shared_annotated_od, annotated_frame_lock_od):
     """Process frames for YOLO inference and track roller defects with pulse debounce & proper exit handling."""
 
-    detected_folder = "captured_od_frames"
-    os.makedirs(detected_folder, exist_ok=True)
+    # Get configuration from shared_data
+    storage_paths = shared_data.get('image_storage_paths', {})
+    image_limit = shared_data.get('image_limit', 10000)
+    warmup_images = shared_data.get('warmup_images', {})
 
     def point_inside(rectangle, list_of_all_rollers , roller_number): 
         
@@ -273,7 +300,8 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
         print("Model is not loaded exiting process")
         return
 
-    warmup_frame = r"assets//images//Warmup OD.jpg"
+    # Load warmup frame from config
+    warmup_frame = warmup_images.get('OD', r"assets//images//Warmup OD.jpg")
     try:
         for i in range(30):  
             model_od.predict(warmup_frame, device=0, conf=0.2, verbose=False)
@@ -287,6 +315,9 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
     od_triggered = False
     roller_id_counter = 0  
     BIGFACE_DETECTED = False
+
+     # Check if allow_all_images is enabled
+    allow_all = shared_data.get('allow_all_images', False)
 
     while True:
         current_od_state = shared_data["od_presence"]
@@ -317,8 +348,7 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
                 
                 frame_number += 1
                 annotated_frame = results[0].plot()
-                save_path = f"{detected_folder}/frame{frame_number}.jpg"
-                cv2.imwrite(save_path, annotated_frame)
+                
 
                 with annotated_frame_lock_od:
                     np_annotated = np.frombuffer(shared_annotated_od.get_obj(), dtype=np.uint8).reshape(frame_shape)
@@ -328,6 +358,17 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
                 roller_only_sorted = [detection for detection in roller_only_sorted if detection[-1] > 0.80 ]
 
                 defect_only_sorted = [detection for detection in detections if detection[0] == "defect"]
+                
+                # Check if there are any defects
+                has_defects = len(defect_only_sorted) > 0
+                
+                # Save based on mode
+                if allow_all:
+                    # Save all frames (with or without defects)
+                    save_all_frames_image(annotated_frame, 'OD', frame_number, storage_paths, is_head=False, max_images=image_limit)
+                if has_defects:
+                    # Only save frames with defects
+                    save_defect_image(annotated_frame, 'OD', frame_number, storage_paths, is_head_defect=False, max_images=image_limit)
 
                 for detection in defect_only_sorted:
                     

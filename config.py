@@ -1,6 +1,7 @@
 """
 Configuration constants and utility functions for Welvision
 """
+import os
 
 # PLC Configuration
 PLC_CONFIG = {
@@ -12,18 +13,11 @@ PLC_CONFIG = {
 
 # Camera Configuration
 CAMERA_CONFIG = {
-    'BIGFACE_INDEX': 0,
-    'OD_INDEX': 1,
+    'BIGFACE_NAME': "DFK 33GP1300e [BF]",
+    'OD_NAME': "DFK 33GP1300e [OD]",
     'FRAME_WIDTH': 1280,
     'FRAME_HEIGHT': 960,
     'FRAME_SHAPE': (960, 1280, 3)
-}
-
-# Model Paths
-MODEL_PATHS = {
-    'BIGFACE': r"C:\Users\NBC\Desktop\WELVISION-Project\Feb models\model_22_feb.pt",
-    'HEAD': r"C:\Users\NBC\Downloads\18 Sep 25 Head Train.pt",
-    'OD': r"C:\Users\NBC\Desktop\WELVISION-Project\FEBRUARY-13-ENDGAME\mainsrc\NewModels\march_20.pt"
 }
 
 # Warmup Images
@@ -32,29 +26,48 @@ WARMUP_IMAGES = {
     'OD': r"assets\images\Warmup OD.jpg"
 }
 
-# Default Confidence Thresholds
-DEFAULT_CONFIDENCE = {
-    'OD': 0.25,
-    'BIGFACE': 0.25
+# Image Storage Paths - Dynamic Desktop paths
+def get_desktop_path():
+    """Get the Desktop path for the current user"""
+    return os.path.join(os.path.expanduser('~'), 'Desktop')
+
+DESKTOP_PATH = get_desktop_path()
+
+# Image Storage Configuration
+IMAGE_STORAGE_PATHS = {
+    'INFERENCE': {
+        'BF': {
+            'DEFECT': os.path.join(DESKTOP_PATH, 'Inference', 'BF', 'Defect'),
+            'HEAD_DEFECT': os.path.join(DESKTOP_PATH, 'Inference', 'BF', 'Head_Defect')
+        },
+        'OD': {
+            'DEFECT': os.path.join(DESKTOP_PATH, 'Inference', 'OD', 'Defect')
+        }
+    },
+    'ALL_FRAMES': {
+        'BF': {
+            'ALL_BF': os.path.join(DESKTOP_PATH, 'All Frames', 'BF', 'All_BF'),
+            'ALL_HEAD': os.path.join(DESKTOP_PATH, 'All Frames', 'BF', 'All_Head')
+        },
+        'OD': {
+            'ALL_OD': os.path.join(DESKTOP_PATH, 'All Frames', 'OD', 'All_OD')
+        }
+    }
 }
 
-# Defect Thresholds
+# Image Management Configuration
+IMAGE_LIMIT_PER_DIRECTORY = 10000
+
+# Default Model Confidence Thresholds
+DEFAULT_CONFIDENCE = {
+    'OD': 0.2,
+    'BIGFACE': 0.2
+}
+
+# Defect Thresholds (placeholder - can be customized)
 DEFECT_THRESHOLDS = {
-    'OD': {
-        "Rust": 50,
-        "Dent": 50,
-        "Spherical Mark": 50,
-        "Damage": 50,
-        "Flat Line": 50,
-        "Damage on End": 50,
-        "Roller": 50
-    },
-    'BIGFACE': {
-        "Damage": 50,
-        "Rust": 50,
-        "Dent": 50,
-        "Roller": 50
-    }
+    'OD': {},
+    'BIGFACE': {}
 }
 
 # UI Colors

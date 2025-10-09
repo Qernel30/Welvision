@@ -1,0 +1,186 @@
+"""
+Inspection Control Module - Start/Stop inspection operations
+"""
+import gc
+import torch
+import snap7
+from snap7.util import set_bool
+from snap7.type import Areas
+from multiprocessing import Process
+from config import CAMERA_CONFIG
+from backend import (
+    plc_communication, 
+    capture_frames_bigface, 
+    handle_slot_control_bigface,
+    process_rollers_bigface,
+    process_frames_od,
+    capture_frames_od,
+    handle_slot_control_od
+)
+
+
+def clear_gpu_cache():
+    """
+    Clear GPU memory and force garbage collection.
+    """
+    gc.collect()                   # Python garbage collector
+    torch.cuda.empty_cache()       # Free cached GPU memory
+    torch.cuda.synchronize()       # Wait for all kernels to finish
+    print("🧹 GPU cache cleared successfully.")
+
+
+def create_processes(app):
+    """
+    Recreates process instances before starting them.
+    
+    Args:
+        app: Main application instance
+    """
+    app.plc_process = Process(
+        target=plc_communication,
+        args=(app.PLC_IP, app.RACK, app.SLOT, app.DB_NUMBER, app.shared_data, app.command_queue),
+        daemon=True
+    )
+
+    app.processes = [
+        Process(target=capture_frames_bigface, args=(app.shared_frame_bigface, app.frame_lock_bigface, app.frame_shape, CAMERA_CONFIG['BIGFACE_NAME']), daemon=True),
+        Process(target=handle_slot_control_bigface, args=(app.roller_queue_bigface, app.shared_data, app.command_queue), daemon=True),
+        Process(target=process_rollers_bigface, args=(app.shared_frame_bigface, app.frame_lock_bigface, app.roller_queue_bigface, app.model_bigface, app.proximity_count_bigface, app.roller_updation_dict, app.queue_lock, app.shared_data, app.frame_shape, app.shared_annotated_bigface, app.annotated_frame_lock_bigface), daemon=True),
+        Process(target=process_frames_od, args=(app.shared_frame_od, app.frame_lock_od, app.roller_queue_od, app.queue_lock, app.shared_data, app.frame_shape, app.roller_updation_dict, app.shared_annotated_od, app.annotated_frame_lock_od), daemon=True),
+        Process(target=capture_frames_od, args=(app.shared_frame_od, app.frame_lock_od, app.frame_shape, CAMERA_CONFIG['OD_NAME']), daemon=True),
+        Process(target=handle_slot_control_od, args=(app.roller_queue_od, app.shared_data, app.command_queue), daemon=True)
+    ]
+
+
+def start_inspection(app):
+    """
+    Start the inspection process.
+    
+    Args:
+        app: Main application instance
+    """
+    if app.inspection_running:
+        print("Inspection is already running!")
+        return
+
+    # Clear GPU cache before starting
+    clear_gpu_cache()
+
+    # Reload models if they were deleted
+    if not hasattr(app, 'model_bigface') or app.model_bigface is None:
+        print("🔄 Reloading Bigface model...")
+        from ultralytics import YOLO
+        app.model_bigface = YOLO(r"models/BF_sr.pt")
+        app.model_bigface.to('cuda')
+        print("   ✓ Bigface model loaded to GPU")
+    
+    if not hasattr(app, 'model_od') or app.model_od is None:
+        print("🔄 Reloading OD model...")
+        from ultralytics import YOLO
+        app.model_od = YOLO(r"models/OD_sr.pt")
+        app.model_od.to('cuda')
+        print("   ✓ OD model loaded to GPU")
+
+    app.inspection_running = True
+    app.start_button.config(state='disabled')
+    app.stop_button.config(state='normal')
+
+    # Recreate processes before starting
+    create_processes(app)
+
+    # Start PLC process
+    if app.plc_process is not None:
+        app.plc_process.start()
+
+    # Start subprocesses
+    for process in app.processes:
+        process.start()
+    
+    print("✅ Inspection started successfully.")
+
+
+def stop_inspection(app):
+    """
+    Stops all running processes.
+    
+    Args:
+        app: Main application instance
+    """
+    if not app.inspection_running:
+        print("Inspection is not running.")
+        return
+
+    # Create PLC client
+    plc_client = snap7.client.Client()
+
+    try:
+        plc_client.connect(app.PLC_IP, app.RACK, app.SLOT)
+        print("✅ PLC Communication: Connected to PLC.")
+    except Exception as e:
+        print(f"❌ PLC Communication: Failed to connect to PLC. Error: {e}")
+        return
+
+    data = plc_client.read_area(Areas.DB, app.DB_NUMBER, 0, 2)  # Read 2 bytes
+
+    set_bool(data, byte_index=1, bool_index=6, value=False)  # Turn OFF specific bit
+    set_bool(data, byte_index=1, bool_index=7, value=False)  # Turn OFF another bit
+
+    # Write back the modified data to DB
+    plc_client.write_area(Areas.DB, app.DB_NUMBER, 0, data)
+    print("✅ PLC Communication: Lights OFF signal sent.")
+    
+    # Close PLC connection
+    plc_client.disconnect()
+            
+    app.inspection_running = False
+    app.start_button.config(state='normal')
+    app.stop_button.config(state='disabled')
+
+    # Stop the PLC process if it's running
+    if app.plc_process.is_alive():
+        app.plc_process.terminate()
+        app.plc_process.join()
+        app.plc_process = None  # Mark it for recreation
+
+    # Stop and clear all subprocesses
+    for process in app.processes:
+        if process.is_alive():
+            process.terminate()
+            process.join()
+
+    app.processes = []  # Clear the list of processes
+
+    # Delete model references to free GPU memory
+    print("🧹 Deleting model references and clearing GPU memory...")
+    if hasattr(app, 'model_bigface') and app.model_bigface is not None:
+        del app.model_bigface
+        app.model_bigface = None
+        print("   ✓ Bigface model reference deleted")
+    
+    if hasattr(app, 'model_od') and app.model_od is not None:
+        del app.model_od
+        app.model_od = None
+        print("   ✓ OD model reference deleted")
+    
+    # Clear GPU cache after stopping
+    clear_gpu_cache()
+
+    print("✅ Inspection stopped successfully.")
+
+
+def toggle_allow_all_images(app):
+    """
+    Toggle the allow all images flag in shared data.
+    
+    Args:
+        app: Main application instance
+    """
+    import tkinter.messagebox as messagebox
+    
+    if hasattr(app, 'shared_data'):
+        app.shared_data['allow_all_images'] = app.allow_all_images_var.get()
+        status = "enabled" if app.allow_all_images_var.get() else "disabled"
+        print(f"Allow All Images: {status}")
+        messagebox.showinfo("Allow All Images", f"All images mode has been {status}.")
+    else:
+        print("Shared data not initialized yet")

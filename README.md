@@ -1,7 +1,7 @@
 # 🎯 Welvision - Roller Inspection System
 
-**Version**: 2.0 - Single Entry Point Architecture  
-**Last Updated**: October 4, 2025  
+**Version**: 2.1 - Modular Frontend & Image Management  
+**Last Updated**: October 9, 2025  
 **Status**: ✅ Production Ready
 
 ---
@@ -15,11 +15,12 @@
 5. [Usage](#-usage)
 6. [Module Documentation](#-module-documentation)
 7. [Configuration](#%EF%B8%8F-configuration)
-8. [Testing](#-testing)
-9. [Deployment](#-deployment)
-10. [Before & After Comparison](#-before--after-comparison)
-11. [Troubleshooting](#-troubleshooting)
-12. [Contributing](#-contributing)
+8. [Image Storage System](#-image-storage-system)
+9. [Testing](#-testing)
+10. [Deployment](#-deployment)
+11. [Before & After Comparison](#-before--after-comparison)
+12. [Troubleshooting](#-troubleshooting)
+13. [Contributing](#-contributing)
 
 ---
 
@@ -53,12 +54,70 @@ python main.py
 
 ### Key Features
 
-✅ **Single Entry Point** - Clean `main.py` launcher  
-✅ **Modular Architecture** - Separated backend and frontend  
+✅ **Modular Architecture** - Clean `main.py` launcher  
+✅ **Page-Based Frontend** - Organized UI modules by page  
+✅ **Separated Backend/Frontend** - Clear separation of concerns  
 ✅ **Centralized Configuration** - All settings in `config.py`  
 ✅ **Real-time Processing** - Multi-process architecture  
 ✅ **GPU Acceleration** - CUDA-enabled YOLO inference  
-✅ **Professional UI** - Tkinter-based GUI with tabs
+✅ **Professional UI** - Tkinter-based GUI with modular tabs  
+✅ **Image Management** - Automatic storage and cleanup
+
+---
+
+## 🏗️ Modular Frontend Architecture
+
+The frontend is now organized into **page-based modules** for better maintainability:
+
+### Page Structure
+
+```
+frontend/
+├── __init__.py                # Frontend package exports (WelVisionApp only)
+├── app.py                     # Main orchestrator (185 lines) ✨ FULLY MODULAR
+│
+├── auth_page/                 # Authentication Module
+│   ├── __init__.py           # Module exports
+│   ├── credentials.py        # User credentials database
+│   └── login_ui.py           # Login page UI (setup_login_page, authenticate_user)
+│
+├── inference_page/            # Inference Tab Components
+│   ├── __init__.py           # Module exports + setup_inference_tab()
+│   ├── camera_feed.py        # Camera display logic
+│   ├── camera_manager.py     # Camera feed management & updates
+│   ├── controls.py           # Control buttons (Start/Stop/Allow All)
+│   ├── inspection_control.py # Inspection operations (start/stop/toggle)
+│   └── threshold_panel.py    # Defect threshold sliders
+│
+├── statistics_page/           # Statistics Tab Components
+│   ├── __init__.py           # Module exports + setup_statistics_tab()
+│   ├── stat_card.py          # Statistics card widgets
+│   ├── defect_breakdown.py   # Defect analysis tables
+│   └── statistics_updater.py # Real-time statistics updates
+│
+└── settings_page/             # Settings Tab Components
+    ├── __init__.py           # Module exports + setup_settings_tab()
+    ├── confidence_sliders.py # Model confidence controls
+    ├── settings_form.py      # Save settings functionality
+    └── settings_utils.py     # Threshold management utilities
+```
+
+### Benefits of Modular Structure
+
+✅ **Better Organization**: Each UI component in its own file  
+✅ **Easy to Navigate**: Find components by page/function  
+✅ **Reusable Components**: Share widgets across pages  
+✅ **Independent Development**: Work on pages without conflicts  
+✅ **Testable**: Unit test individual components  
+✅ **Scalable**: Add new pages or components easily  
+
+### How It Works
+
+1. **Page Modules**: Each page has a dedicated folder
+2. **Component Files**: Individual files for specific functionality
+3. **Setup Functions**: Each page's `__init__.py` contains the main setup function
+4. **Clean Exports**: Each module exposes only necessary functions
+5. **Direct Imports**: App imports directly from page modules (no wrapper files)
 
 ---
 
@@ -72,24 +131,48 @@ Welvision-Rebuild/
 │
 ├── backend/                     # 📦 ALL BACKEND CODE
 │   ├── __init__.py             # Package exports
-│   ├── csv_logger.py           # CSV file operations (47 lines)
+│   ├── image_manager.py        # Image storage & cleanup (217 lines)
 │   ├── plc_communication.py    # PLC interface (115 lines)
 │   ├── frame_capture.py        # Camera capture (54 lines)
 │   ├── yolo_processing.py      # YOLO detection (302 lines)
-│   └── slot_control.py         # Accept/reject control (35 lines)
+│   ├── slot_control.py         # Accept/reject control (35 lines)
+│   └── camera_detector.py      # Camera detection utilities
 │
-├── frontend/                    # 🎨 ALL FRONTEND CODE
-│   ├── __init__.py             # Package exports
-│   ├── app.py                  # WelVisionApp class (495 lines)
-│   ├── auth.py                 # User credentials (8 lines)
-│   ├── inference_tab.py        # Inference UI (88 lines)
-│   ├── statistics_tab.py       # Statistics UI (174 lines)
-│   ├── settings_tab.py         # Settings UI (103 lines)
-│   └── camera_manager.py       # Camera management (52 lines)
+├── frontend/                    # 🎨 ALL FRONTEND CODE (MODULAR)
+│   ├── __init__.py             # Package exports (WelVisionApp only)
+│   ├── app.py                  # Main WelVisionApp class (185 lines) ✨ REDUCED 56%
+│   │
+│   ├── auth_page/              # 🔐 Authentication Module
+│   │   ├── __init__.py         # Module exports
+│   │   ├── credentials.py      # User credentials database
+│   │   └── login_ui.py         # Login page UI components
+│   │
+│   ├── inference_page/         # 📹 Inference Tab Module
+│   │   ├── __init__.py         # Module exports + setup_inference_tab()
+│   │   ├── camera_feed.py      # Camera display components
+│   │   ├── camera_manager.py   # Camera feed management
+│   │   ├── controls.py         # Control buttons
+│   │   ├── inspection_control.py  # Start/stop inspection operations
+│   │   └── threshold_panel.py  # Defect threshold sliders
+│   │
+│   ├── statistics_page/        # 📊 Statistics Tab Module
+│   │   ├── __init__.py         # Module exports + setup_statistics_tab()
+│   │   ├── stat_card.py        # Statistics card components
+│   │   ├── defect_breakdown.py # Defect breakdown tables
+│   │   └── statistics_updater.py  # Real-time statistics updates
+│   │
+│   └── settings_page/          # ⚙️ Settings Tab Module
+│       ├── __init__.py         # Module exports + setup_settings_tab()
+│       ├── confidence_sliders.py  # Model confidence sliders
+│       ├── settings_form.py    # Save settings button
+│       └── settings_utils.py   # Threshold management utilities
 │
 ├── config.py                    # ⚙️ CENTRALIZED CONFIGURATION
 │   ├─ PLC_CONFIG              # PLC connection settings
 │   ├─ CAMERA_CONFIG           # Camera indices & resolution
+│   ├─ IMAGE_STORAGE_PATHS     # Dynamic Desktop paths
+│   ├─ IMAGE_LIMIT_PER_DIRECTORY  # 10000 images max
+│   ├─ WARMUP_IMAGES           # Model warmup image paths
 │   ├─ MODEL_PATHS             # YOLO model file paths
 │   ├─ DEFECT_THRESHOLDS       # Detection thresholds
 │   └─ UI_COLORS               # Interface color scheme
@@ -482,6 +565,314 @@ UI_COLORS = {
     'PRIMARY': '#3b82f6'           # Bright blue
 }
 ```
+
+---
+
+## 📦 Image Storage System
+
+### Overview
+
+Welvision v2.1 introduces a comprehensive image storage and management system that automatically saves inspection images to the user's Desktop with intelligent defect filtering and automatic cleanup.
+
+### Storage Location
+
+All images are saved to your **Desktop** in organized folders:
+
+```
+Desktop/
+├── Inference/                  # Defect-only images (default)
+│   ├── BF/
+│   │   ├── Defect/            # BF surface defects
+│   │   └── Head_Defect/       # BF head defects
+│   └── OD/
+│       └── Defect/            # OD defects
+│
+└── All Frames/                 # All frames (when enabled)
+    ├── BF/
+    │   ├── All_BF/            # All BF frames
+    │   └── All_Head/          # All head frames
+    └── OD/
+        └── All_OD/            # All OD frames
+```
+
+### Features
+
+#### 🎯 Defect-Only Mode (Default)
+- Only frames with detected defects are saved
+- Reduces storage usage by ~70-90%
+- Optimized for production environments
+- Focuses on quality control
+
+#### 📸 All Images Mode
+- Toggle via "Allow All Images" checkbox in Inference tab
+- Saves ALL frames (defected + non-defected)
+- Useful for training data collection
+- Helpful for system analysis
+
+#### 🧹 Automatic Cleanup
+- Each directory maintains maximum of **10,000 images**
+- Oldest images automatically removed when limit reached
+- Uses `os.scandir()` for fastest counting
+- Based on file creation time
+- No manual intervention needed
+
+#### ⚙️ Configuration-Based
+- All paths defined in `config.py`
+- Dynamic Desktop path detection
+- Works for any Windows user account
+- Easy to customize
+
+### Using "Allow All Images" Feature
+
+**Step-by-Step Guide:**
+
+1. Launch Welvision application
+2. Navigate to **Inference** tab
+3. Locate **"Allow All Images"** checkbox
+4. Check the box to enable all-frames mode
+5. Click **"Start Inspection"**
+6. All frames will now be saved to `All Frames/` folders
+
+**When to Use:**
+- ✅ Collecting training data for model improvement
+- ✅ Analyzing system performance
+- ✅ Debugging detection issues
+- ✅ Creating demonstration videos
+- ❌ Not recommended for production (high storage usage)
+
+### Image Management Configuration
+
+In `config.py`:
+
+```python
+# Image Storage Paths (Dynamic Desktop)
+IMAGE_STORAGE_PATHS = {
+    'INFERENCE': {
+        'BF': {
+            'DEFECT': os.path.join(DESKTOP_PATH, 'Inference', 'BF', 'Defect'),
+            'HEAD_DEFECT': os.path.join(DESKTOP_PATH, 'Inference', 'BF', 'Head_Defect')
+        },
+        'OD': {
+            'DEFECT': os.path.join(DESKTOP_PATH, 'Inference', 'OD', 'Defect')
+        }
+    },
+    'ALL_FRAMES': {
+        'BF': {
+            'ALL_BF': os.path.join(DESKTOP_PATH, 'All Frames', 'BF', 'All_BF'),
+            'ALL_HEAD': os.path.join(DESKTOP_PATH, 'All Frames', 'BF', 'All_Head')
+        },
+        'OD': {
+            'ALL_OD': os.path.join(DESKTOP_PATH, 'All Frames', 'OD', 'All_OD')
+        }
+    }
+}
+
+# Maximum images per directory
+IMAGE_LIMIT_PER_DIRECTORY = 10000
+
+# Warmup images configuration
+WARMUP_IMAGES = {
+    'BIGFACE': r"assets\images\Warmup BF.jpg",
+    'OD': r"assets\images\Warmup OD.jpg"
+}
+```
+
+### Image Manager Module
+
+Located at `backend/image_manager.py`, this module provides:
+
+#### Key Functions
+
+**`save_defect_image(image, camera_type, frame_number, storage_paths, is_head_defect, max_images)`**
+- Saves defect-only images to appropriate directories
+- Automatically handles cleanup
+- Supports both BF and OD cameras
+- Separates head defects from surface defects
+
+**`save_all_frames_image(image, camera_type, frame_number, storage_paths, is_head, max_images)`**
+- Saves all frames when "Allow All Images" is enabled
+- Maintains separate folders for all frames
+- Same cleanup logic as defect images
+
+**`cleanup_old_images(directory_path, max_images=10000)`**
+- Removes oldest images when limit exceeded
+- Uses `os.scandir()` for optimal performance
+- Based on file creation time
+- Called automatically during image saving
+
+**`count_images_in_directory(directory_path)`**
+- Fast image counting using `os.scandir()`
+- Ignores subdirectories
+- Only counts image files (.jpg, .jpeg, .png, .bmp)
+
+**`ensure_directory_exists(directory_path)`**
+- Creates directories if they don't exist
+- Handles nested directory creation
+- Called automatically at startup
+
+**`initialize_storage_directories(storage_paths)`**
+- Creates all required directories at application startup
+- Called from `app.py` during initialization
+- Ensures clean setup
+
+#### Usage Example
+
+```python
+from backend.image_manager import save_defect_image, save_all_frames_image
+
+# In YOLO processing functions
+def process_frames(..., shared_data, ...):
+    # Get configuration
+    storage_paths = shared_data.get('image_storage_paths', {})
+    image_limit = shared_data.get('image_limit', 10000)
+    allow_all = shared_data.get('allow_all_images', False)
+    
+    # Process frame...
+    
+    # Save based on mode
+    if allow_all:
+        # Save all frames
+        save_all_frames_image(
+            annotated_frame, 
+            'BF', 
+            frame_number, 
+            storage_paths,
+            is_head=False,
+            max_images=image_limit
+        )
+    elif has_defects:
+        # Save only defects
+        save_defect_image(
+            annotated_frame,
+            'BF',
+            frame_number,
+            storage_paths,
+            is_head_defect=False,
+            max_images=image_limit
+        )
+```
+
+### Performance Characteristics
+
+- **Image Counting**: Uses `os.scandir()` - fastest method available
+- **Cleanup Speed**: O(n) where n = number of images over limit
+- **Storage Overhead**: Minimal (only metadata tracking)
+- **Thread Safety**: Compatible with multiprocessing architecture
+
+### Customization
+
+#### Change Image Limit
+
+```python
+# config.py
+IMAGE_LIMIT_PER_DIRECTORY = 15000  # Increase to 15,000 images
+```
+
+#### Change Storage Location
+
+```python
+# config.py
+def get_desktop_path():
+    return r"C:\Custom\Path"  # Use custom path instead of Desktop
+
+DESKTOP_PATH = get_desktop_path()
+```
+
+#### Add New Camera Type
+
+1. Update `IMAGE_STORAGE_PATHS` in `config.py`:
+```python
+IMAGE_STORAGE_PATHS = {
+    'INFERENCE': {
+        'NEW_CAMERA': {
+            'DEFECT': os.path.join(DESKTOP_PATH, 'Inference', 'NEW_CAMERA', 'Defect')
+        }
+    },
+    'ALL_FRAMES': {
+        'NEW_CAMERA': {
+            'ALL': os.path.join(DESKTOP_PATH, 'All Frames', 'NEW_CAMERA', 'All')
+        }
+    }
+}
+```
+
+2. Update `save_defect_image()` and `save_all_frames_image()` in `image_manager.py`
+
+#### Disable Automatic Cleanup
+
+```python
+# config.py
+IMAGE_LIMIT_PER_DIRECTORY = 999999  # Effectively unlimited
+```
+
+### Benefits
+
+✅ **Storage Efficiency**: Saves only what matters (defects)  
+✅ **Flexibility**: Can switch to all-frames mode anytime  
+✅ **Automatic Management**: No manual cleanup needed  
+✅ **Fast Performance**: Optimized file operations  
+✅ **User-Friendly**: Images on Desktop for easy access  
+✅ **Dynamic Configuration**: Works for any user account  
+✅ **Maintainable**: Modular code architecture  
+✅ **Configurable**: All settings in central config file  
+
+### Troubleshooting
+
+#### Images Not Saving
+
+**Problem**: No images appear in Desktop folders
+
+**Solutions**:
+- Check Desktop folder permissions
+- Verify `allow_all_images` flag is set correctly (for all-frames mode)
+- Ensure `storage_paths` is passed in `shared_data`
+- Check console output for error messages
+- Verify defects are being detected (for defect-only mode)
+
+#### Directory Not Created
+
+**Problem**: Folders don't appear on Desktop
+
+**Solutions**:
+- Verify Desktop path is accessible: `os.path.expanduser('~')`
+- Check `initialize_storage_directories()` is called in `app.py`
+- Ensure no Windows permissions issues
+- Try running as administrator
+
+#### Image Limit Not Working
+
+**Problem**: More than 10,000 images in folder
+
+**Solutions**:
+- Verify `image_limit` is set in `shared_data`
+- Check `cleanup_old_images()` is being called
+- Ensure `os.scandir()` has directory access
+- Check for file system errors in console
+
+#### Warmup Images Not Loading
+
+**Problem**: YOLO warmup fails at startup
+
+**Solutions**:
+- Check `WARMUP_IMAGES` paths in `config.py`
+- Verify warmup images exist in `assets/images/`
+- Ensure `shared_data['warmup_images']` is set
+- Check file paths use correct backslashes for Windows
+
+### API Reference
+
+#### `backend.image_manager` Module
+
+| Function | Description | Parameters |
+|----------|-------------|------------|
+| `ensure_directory_exists` | Creates directory if needed | `directory_path: str` |
+| `count_images_in_directory` | Fast image counting | `directory_path: str` → `int` |
+| `get_oldest_image` | Find oldest image by creation time | `directory_path: str` → `Optional[str]` |
+| `cleanup_old_images` | Remove oldest images | `directory_path: str, max_images: int` |
+| `save_image_with_limit` | Save with automatic cleanup | `image, directory_path: str, filename: str, max_images: int` → `str` |
+| `save_defect_image` | Save defect to proper folder | `image, camera_type: str, frame_number: int, storage_paths: dict, is_head_defect: bool, max_images: int` → `str` |
+| `save_all_frames_image` | Save all frames (when enabled) | `image, camera_type: str, frame_number: int, storage_paths: dict, is_head: bool, max_images: int` → `str` |
+| `initialize_storage_directories` | Create all directories | `storage_paths: dict` |
 
 ---
 
@@ -925,6 +1316,28 @@ python structure_diagram.py
 
 ## 🔄 Version History
 
+### Version 2.1 - October 9, 2025
+- ✅ **Frontend Modularization**: Page-based module structure
+  - Created `inference_page/`, `statistics_page/`, `settings_page/`, `auth_page/`
+  - Separated UI components into focused modules
+  - Improved code organization and maintainability
+- ✅ **Image Management System**: Automatic storage to Desktop
+  - Added `backend/image_manager.py` module
+  - Dynamic Desktop path detection
+  - Defect-only and all-frames modes
+  - 10,000 image limit with automatic cleanup
+  - Fast counting using `os.scandir()`
+- ✅ **Configuration Updates**: Enhanced `config.py`
+  - `IMAGE_STORAGE_PATHS` for Desktop storage
+  - `IMAGE_LIMIT_PER_DIRECTORY` setting
+  - `WARMUP_IMAGES` configuration
+  - `DEFAULT_CONFIDENCE` thresholds
+- ✅ **Documentation Consolidation**: All docs in README.md
+  - Integrated implementation summary
+  - Added quick reference guides
+  - Comprehensive API documentation
+  - Troubleshooting guides
+
 ### Version 2.0 - October 4, 2025
 - ✅ Restructured to single entry point (`main.py`)
 - ✅ Moved all backend code to `backend/` package
@@ -974,9 +1387,9 @@ pip freeze > requirements.txt
 
 ---
 
-**Last Updated**: October 4, 2025  
+**Last Updated**: October 9, 2025  
 **Status**: ✅ Production Ready  
-**Version**: 2.0 - Single Entry Point Architecture
+**Version**: 2.1 - Modular Frontend & Image Management
 
 ---
 

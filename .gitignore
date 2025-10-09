@@ -1,1 +1,7 @@
 /.vscode
+venv/
+__pycache__/
+env/
+captured_bigface_frames/
+captured_head_frames/
+captured_od_frames/
