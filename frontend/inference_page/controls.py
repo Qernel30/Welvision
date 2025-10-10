@@ -2,60 +2,113 @@
 Control Buttons for Inference Tab
 """
 import tkinter as tk
+from config import UI_COLORS
 from .inspection_control import start_inspection, stop_inspection, toggle_allow_all_images
 
 
 def setup_control_buttons(app, parent):
     """
-    Setup inspection control buttons
+    Setup inspection control buttons (Start, Stop, Reset, Allow all images)
     
     Args:
         app: Main application instance
         parent: Parent frame (inference tab)
     """
     # Control buttons frame
-    control_buttons_frame = tk.Frame(parent, bg="#0a2158")
-    control_buttons_frame.pack(fill=tk.X, padx=5, pady=5)
+    control_buttons_frame = tk.Frame(parent, bg=UI_COLORS['PRIMARY_BG'])
+    control_buttons_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
     
-    # Start button
+    # Left side - buttons
+    button_container = tk.Frame(control_buttons_frame, bg=UI_COLORS['PRIMARY_BG'])
+    button_container.pack(side=tk.LEFT, padx=10)
+    
+    # Start button - Green (navbar style)
     app.start_button = tk.Button(
-        control_buttons_frame, 
-        text="Start Inspection", 
-        font=("Arial", 10, "bold"), 
-        bg="#28a745", 
+        button_container, 
+        text="Start", 
+        font=("Arial", 12, "bold"), 
+        bg="#28a745",  # Green
         fg="white", 
-        width=12, 
-        height=1, 
+        relief=tk.FLAT,
+        bd=0,
+        padx=40,  # Wider like navbar
+        pady=10,  # Taller like navbar
+        cursor="hand2",
         command=lambda: start_inspection(app)
     )
-    app.start_button.pack(side=tk.LEFT, padx=20, pady=5)
+    app.start_button.pack(side=tk.LEFT, padx=5, pady=5)
     
-    # Stop button
+    # Stop button - Gray (disabled by default, navbar style)
     app.stop_button = tk.Button(
-        control_buttons_frame, 
-        text="Stop Inspection", 
-        font=("Arial", 10, "bold"), 
-        bg="#dc3545", 
+        button_container, 
+        text="Stop", 
+        font=("Arial", 12, "bold"), 
+        bg="#6c757d",  # Gray
         fg="white", 
-        width=12, 
-        height=1, 
+        relief=tk.FLAT,
+        bd=0,
+        padx=40,  # Wider like navbar
+        pady=10,  # Taller like navbar
+        cursor="hand2",
         command=lambda: stop_inspection(app), 
         state=tk.DISABLED
     )
-    app.stop_button.pack(side=tk.LEFT, padx=20, pady=5)
+    app.stop_button.pack(side=tk.LEFT, padx=5, pady=5)
     
-    # Allow All Images toggle
+    # Reset button - Orange (navbar style)
+    app.reset_button = tk.Button(
+        button_container, 
+        text="Reset", 
+        font=("Arial", 12, "bold"), 
+        bg="#FF8C00",  # Orange
+        fg="white", 
+        relief=tk.FLAT,
+        bd=0,
+        padx=40,  # Wider like navbar
+        pady=10,  # Taller like navbar
+        cursor="hand2",
+        command=lambda: reset_statistics(app)
+    )
+    app.reset_button.pack(side=tk.LEFT, padx=5, pady=5)
+    
+    # Right side - checkbox (larger)
+    checkbox_container = tk.Frame(control_buttons_frame, bg=UI_COLORS['PRIMARY_BG'])
+    checkbox_container.pack(side=tk.LEFT, padx=20)
+    
+    # Allow All Images checkbox - larger size
     app.allow_all_images_var = tk.BooleanVar(value=False)
     allow_all_images_check = tk.Checkbutton(
-        control_buttons_frame,
-        text="Allow All Images",
-        font=("Arial", 10, "bold"),
+        checkbox_container,
+        text="Allow all images",
+        font=("Arial", 13, "bold"),  # Increased from 11 to 13
         variable=app.allow_all_images_var,
-        bg="#0a2158",
+        bg=UI_COLORS['PRIMARY_BG'],
         fg="white",
-        selectcolor="#1a3168",
-        activebackground="#0a2158",
+        selectcolor=UI_COLORS['SECONDARY_BG'],
+        activebackground=UI_COLORS['PRIMARY_BG'],
         activeforeground="white",
+        cursor="hand2",
         command=lambda: toggle_allow_all_images(app)
     )
-    allow_all_images_check.pack(side=tk.LEFT, padx=20, pady=5)
+    allow_all_images_check.pack(pady=5)
+
+
+def reset_statistics(app):
+    """Reset all statistics to zero"""
+    # Reset BF stats
+    app.bf_inspected = 0
+    app.bf_defective = 0
+    app.bf_good = 0
+    
+    # Reset OD stats
+    app.od_inspected = 0
+    app.od_defective = 0
+    app.od_good = 0
+    
+    # Update displays
+    from .results_display import update_bf_results, update_od_results, update_overall_results
+    update_bf_results(app)
+    update_od_results(app)
+    update_overall_results(app)
+    
+    print("📊 Statistics reset to zero")

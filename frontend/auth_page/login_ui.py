@@ -55,18 +55,18 @@ def setup_login_page(app):
     # Email - increased size
     email_label = tk.Label(login_frame, text="Email", font=("Arial", 13), 
                           fg=UI_COLORS['WHITE'], bg=UI_COLORS['BLACK'], anchor="w")
-    email_label.pack(fill="x", pady=(0, 8))
+    email_label.pack(fill="x", padx=40, pady=(0, 8))
     
     app.email_entry = tk.Entry(login_frame, font=("Arial", 13), width=45)
-    app.email_entry.pack(pady=(0, 20), ipady=10)
+    app.email_entry.pack(padx=40, pady=(0, 20), ipady=10)
     
     # Password - increased size
     password_label = tk.Label(login_frame, text="Password", font=("Arial", 13), 
                              fg=UI_COLORS['WHITE'], bg=UI_COLORS['BLACK'], anchor="w")
-    password_label.pack(fill="x", pady=(0, 8))
+    password_label.pack(fill="x", padx=40, pady=(0, 8))
     
     app.password_entry = tk.Entry(login_frame, font=("Arial", 13), width=45, show="*")
-    app.password_entry.pack(pady=(0, 35), ipady=10)
+    app.password_entry.pack(padx=40, pady=(0, 35), ipady=10)
     
     # Sign in button - increased size and stored reference
     app.sign_in_button = tk.Button(login_frame, text="Sign In", font=("Arial", 14, "bold"), 
@@ -76,9 +76,9 @@ def setup_login_page(app):
     
     # Bind Enter key to authenticate with visual feedback
     def on_enter_press(event):
-        # Visual feedback - button press effect (both relief and color change)
+        # Visual feedback - button press effect (white background, black text)
         original_bg = app.sign_in_button.cget('bg')
-        app.sign_in_button.config(relief=tk.SUNKEN, bg=UI_COLORS['WHITE'], fg=UI_COLORS['PRIMARY'])
+        app.sign_in_button.config(relief=tk.SUNKEN, bg=UI_COLORS['WHITE'], fg=UI_COLORS['BLACK'])
         # Delay authentication to show visual effect, then restore button if it still exists
         def authenticate_delayed():
             authenticate_user(app)

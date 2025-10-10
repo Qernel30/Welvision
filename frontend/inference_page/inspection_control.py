@@ -48,6 +48,9 @@ def monitor_inspection_ready(app):
     while not app.shared_data.get('plc_ready', False):
         time.sleep(0.1)
     
+    # Update UI status indicators on main thread
+    app.after(0, lambda: update_ui_status_ready(app))
+    
     # Show success message on main thread
     app.after(0, lambda: messagebox.showinfo(
         "Inspection Started", 
@@ -57,6 +60,24 @@ def monitor_inspection_ready(app):
         "• PLC: Connected and Ready\n"
         "• Lights: ON"
     ))
+
+
+def update_ui_status_ready(app):
+    """Update UI elements when inspection is ready"""
+    from .status_indicators import update_status_indicator
+    from .top_panel import update_model_status, update_disc_status
+    
+    # Update camera status indicators
+    if hasattr(app, 'bf_status_indicator'):
+        update_status_indicator(app.bf_status_indicator, ready=True)
+    if hasattr(app, 'od_status_indicator'):
+        update_status_indicator(app.od_status_indicator, ready=True)
+    
+    # Update model status
+    update_model_status(app, bf_loaded=True, od_loaded=True)
+    
+    # Update disc status
+    update_disc_status(app, ready=True)
 
 
 def create_processes(app):
@@ -173,6 +194,9 @@ def stop_inspection(app):
     
     # Close PLC connection
     plc_client.disconnect()
+    
+    # Update UI status to not ready
+    update_ui_status_not_ready(app)
             
     app.inspection_running = False
     app.start_button.config(state='normal')
@@ -208,6 +232,24 @@ def stop_inspection(app):
     clear_gpu_cache()
 
     print("✅ Inspection stopped successfully.")
+
+
+def update_ui_status_not_ready(app):
+    """Update UI elements when inspection is stopped"""
+    from .status_indicators import update_status_indicator
+    from .top_panel import update_model_status, update_disc_status
+    
+    # Update camera status indicators
+    if hasattr(app, 'bf_status_indicator'):
+        update_status_indicator(app.bf_status_indicator, ready=False)
+    if hasattr(app, 'od_status_indicator'):
+        update_status_indicator(app.od_status_indicator, ready=False)
+    
+    # Update model status
+    update_model_status(app, bf_loaded=False, od_loaded=False)
+    
+    # Update disc status
+    update_disc_status(app, ready=False)
 
 
 def toggle_allow_all_images(app):

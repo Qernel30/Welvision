@@ -2,6 +2,7 @@
 Statistics Updater - Real-time statistics display updates
 """
 import numpy as np
+import tkinter as tk
 
 
 def update_statistics(app):
@@ -62,5 +63,10 @@ def update_statistics(app):
             total_proportion = (total_defective / total_inspected) * 100
             app.total_proportion_var.set(f"{total_proportion:.1f}%")
     
-    # Schedule next update
-    app.after(100, lambda: update_statistics(app))
+    # Schedule next update - only if widgets still exist
+    try:
+        if hasattr(app, 'od_inspected_var') and app.winfo_exists():
+            app.after(100, lambda: update_statistics(app))
+    except tk.TclError:
+        # Widget was destroyed, stop updating
+        pass

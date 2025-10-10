@@ -1,6 +1,6 @@
 # 🎯 Welvision - Roller Inspection System
 
-**Version**: 2.2 - PLC Configuration & Model-Ready Inspection  
+**Version**: 2.3.1 - Modern Inference UI & Modular Architecture  
 **Last Updated**: October 10, 2025  
 **Status**: ✅ Production Ready
 
@@ -9,22 +9,23 @@
 ## 📖 Table of Contents
 
 1. [Quick Start](#-quick-start)
-2. [What's New in v2.2](#-whats-new-in-v22)
-3. [Navigation Bar System](#-navigation-bar-system)
-4. [Project Overview](#-project-overview)
-5. [Project Structure](#-project-structure)
-6. [Installation](#-installation)
-7. [Usage](#-usage)
-8. [Module Documentation](#-module-documentation)
-9. [Configuration](#%EF%B8%8F-configuration)
-10. [PLC Configuration](#-plc-configuration)
-11. [Image Storage System](#-image-storage-system)
-12. [Inspection Flow](#-inspection-flow)
-13. [Testing](#-testing)
-14. [Deployment](#-deployment)
-15. [Before & After Comparison](#-before--after-comparison)
-16. [Troubleshooting](#-troubleshooting)
-17. [Contributing](#-contributing)
+2. [What's New in v2.3.1](#-whats-new-in-v231)
+3. [Inference UI](#-inference-ui)
+4. [Navigation Bar System](#-navigation-bar-system)
+5. [Project Overview](#-project-overview)
+6. [Project Structure](#-project-structure)
+7. [Installation](#-installation)
+8. [Usage](#-usage)
+9. [Module Documentation](#-module-documentation)
+10. [Configuration](#%EF%B8%8F-configuration)
+11. [PLC Configuration](#-plc-configuration)
+12. [Image Storage System](#-image-storage-system)
+13. [Inspection Flow](#-inspection-flow)
+14. [Testing](#-testing)
+15. [Deployment](#-deployment)
+16. [Before & After Comparison](#-before--after-comparison)
+17. [Troubleshooting](#-troubleshooting)
+18. [Contributing](#-contributing)
 
 ---
 
@@ -68,6 +69,152 @@ python main.py
    ```
 6. Click **OK** to dismiss popup
 7. System is now fully operational!
+
+---
+
+## 🆕 What's New in v2.3.1
+
+### Major Updates
+
+✅ **Modern Inference UI** - Professional 3-column layout matching industry standards  
+✅ **Removed Threshold Controls** - Moved to Settings tab for cleaner interface  
+✅ **Right Panel Integration** - Overall Result + Roller Info visible during inspection  
+✅ **Improved Layout** - BF Feed | OD Feed | Right Panel structure  
+✅ **Bottom Results** - Clean 2-column display for BF and OD results  
+✅ **All Buttons Present** - Start, Stop, Reset properly positioned  
+
+### Inference UI Layout
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    TOP PANEL (6 Sections)                        │
+│  Roller | Date/Time | Mode | Status | Confidence | AI Models   │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────┬──────────────┬──────────────────────────────────┐
+│  BF Feed     │  OD Feed     │  Overall Result:                 │
+│● Not Ready   │● Not Ready   │  Inspected : 0                   │
+│┌────────────┐│┌────────────┐│  Ok rollers : 0                  │
+││  Camera    │││  Camera    ││  Not OK rollers: 0               │
+││  Feed      │││  Feed      ││  Percentage: 0.0%                │
+││            │││            ││──────────────────────────────────│
+││            │││            ││  Roller Info:                    │
+││            │││            ││  Outer Diameter : 25 mm          │
+│└────────────┘│└────────────┘│  Dimple Diameter: 20 mm          │
+│              │              │  Small Diameter : 15 mm          │
+│              │              │  Roller Length : 40.25 mm        │
+│              │              │  High Head: 0 pixels             │
+│              │              │  Down Head: 0 pixels             │
+└──────────────┴──────────────┴──────────────────────────────────┘
+
+┌─────────────────────────────┬──────────────────────────────────┐
+│  Bigface Result:            │  OD Result:                      │
+│  Inspected : 0              │  Inspected : 0                   │
+│  Ok rollers : 0             │  Ok rollers : 0                  │
+│  Not OK rollers: 0          │  Not OK rollers: 0               │
+│  Percentage: 0.0%           │  Percentage: 0.0%                │
+└─────────────────────────────┴──────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│  [Start] [Stop] [Reset]              ☐ Allow all images          │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Key Changes from v2.2
+
+**Removed:**
+- ❌ Threshold adjustment sliders from inference page
+- ❌ Separate threshold panel
+
+**Added:**
+- ✅ 3-column camera section layout
+- ✅ Right panel with Overall Result + Roller Info
+- ✅ Status indicators above camera feeds
+- ✅ Stop button between Start and Reset
+
+**Moved:**
+- 📋 Threshold controls → Settings tab (where they belong)
+- 📋 Overall Result → Right panel (visible during inspection)
+- 📋 Roller Info → Right panel (always visible)
+
+---
+
+## 🎨 Inference UI
+
+### Top Panel (6 Sections)
+
+1. **Roller type** - Dropdown selector for roller type
+2. **Date & Time** - Live clock updating every second
+3. **Machine Mode** - AUTO/MANUAL indicator (green text)
+4. **Disc Status** - Ready/Not Ready status (red/green)
+5. **Confidence Thresholds** - BF & OD model confidence display
+6. **AI Models** - Model loading status with Settings page link
+
+### Camera Section (3 Columns)
+
+**Layout Weights**: BF Feed (40%) | OD Feed (40%) | Right Panel (20%)
+
+#### Left: BF Feed
+- Header: "BF Feed" with status indicator
+- Canvas: 640x480 black background
+- Status: ● Not Ready / ● Ready
+
+#### Middle: OD Feed
+- Header: "OD Feed" with status indicator
+- Canvas: 640x480 black background
+- Status: ● Not Ready / ● Ready
+
+#### Right: Overall Result + Roller Info
+
+**Overall Result:**
+- Inspected: Total count
+- Ok rollers: Good count
+- Not OK rollers: Defective count
+- Percentage: Defect percentage
+
+**Roller Info:**
+- Outer Diameter: 25 mm
+- Dimple Diameter: 20 mm
+- Small Diameter: 15 mm
+- Roller Length: 40.25 mm
+- High Head (pixels): 0 pixels
+- Down Head (pixels): 0 pixels
+
+### Bottom Results (2 Columns)
+
+**Left: Bigface Result**
+- Inspected, Ok, Not OK, Percentage
+
+**Right: OD Result**
+- Inspected, Ok, Not OK, Percentage
+
+### Control Buttons
+
+- **Start** (Green) - Begin inspection
+- **Stop** (Gray) - Stop inspection (disabled initially)
+- **Reset** (Orange) - Reset all statistics to zero
+- **Allow all images** (Checkbox) - Save all frames vs defects only
+
+### Color Scheme
+
+**Status Colors:**
+- Ready: `#00FF00` (Bright Green)
+- Not Ready: `#FF0000` (Red)
+- AUTO Mode: `#00FF00` (Bright Green)
+
+**Button Colors:**
+- Start: `#28a745` (Green)
+- Stop: `#6c757d` (Gray)
+- Reset: `#FF8C00` (Orange)
+
+**Background:**
+- Primary: `#0a2158` (Navy Blue)
+- Secondary: `#1a3168` (Lighter Navy)
+
+**Text:**
+- White: Main text
+- Cyan: `#00CED1` (Confidence values)
+- Tomato: `#FF6347` (No model selected)
 
 ---
 
@@ -337,13 +484,15 @@ frontend/
 │   ├── credentials.py        # User credentials database
 │   └── login_ui.py           # Login page UI (setup_login_page, authenticate_user)
 │
-├── inference_page/            # Inference Tab Components
+├── inference_page/            # Inference Tab Components (v2.3.1)
 │   ├── __init__.py           # Module exports + setup_inference_tab()
-│   ├── camera_feed.py        # Camera display logic
-│   ├── camera_manager.py     # Camera feed management & updates
-│   ├── controls.py           # Control buttons (Start/Stop/Allow All)
-│   ├── inspection_control.py # Inspection operations (start/stop/toggle)
-│   └── threshold_panel.py    # Defect threshold sliders
+│   ├── top_panel.py          # Top 6-section panel (Roller/Date/Mode/Status/Confidence/Models)
+│   ├── camera_feed.py        # Camera displays + right panel (Overall+Roller Info)
+│   ├── camera_manager.py     # Camera feed management & statistics updates
+│   ├── controls.py           # Control buttons (Start/Stop/Reset/Allow All)
+│   ├── inspection_control.py # Inspection operations (start/stop/UI updates)
+│   ├── results_display.py    # Bottom results (BF Result, OD Result)
+│   └── status_indicators.py  # Status indicator widgets (Ready/Not Ready)
 │
 ├── statistics_page/           # Statistics Tab Components
 │   ├── __init__.py           # Module exports + setup_statistics_tab()
@@ -351,11 +500,11 @@ frontend/
 │   ├── defect_breakdown.py   # Defect analysis tables
 │   └── statistics_updater.py # Real-time statistics updates
 │
-└── settings_page/             # Settings Tab Components
+└── settings_page/             # Settings Tab Components  
     ├── __init__.py           # Module exports + setup_settings_tab()
     ├── confidence_sliders.py # Model confidence controls
     ├── settings_form.py      # Save settings functionality
-    └── settings_utils.py     # Threshold management utilities
+    └── settings_utils.py     # Threshold management utilities (moved from inference)
 ```
 
 ### Benefits of Modular Structure
@@ -403,13 +552,15 @@ Welvision-Rebuild/
 │   │   ├── credentials.py      # User credentials database
 │   │   └── login_ui.py         # Login page UI components
 │   │
-│   ├── inference_page/         # 📹 Inference Tab Module
+│   ├── inference_page/         # 📹 Inference Tab Module (v2.3.1 - Redesigned)
 │   │   ├── __init__.py         # Module exports + setup_inference_tab()
-│   │   ├── camera_feed.py      # Camera display components
-│   │   ├── camera_manager.py   # Camera feed management
-│   │   ├── controls.py         # Control buttons
-│   │   ├── inspection_control.py  # Start/stop inspection operations
-│   │   └── threshold_panel.py  # Defect threshold sliders
+│   │   ├── top_panel.py        # Top 6-section panel
+│   │   ├── camera_feed.py      # Camera displays + right panel
+│   │   ├── camera_manager.py   # Camera feed management & stats
+│   │   ├── controls.py         # Control buttons (Start/Stop/Reset)
+│   │   ├── inspection_control.py  # Start/stop inspection + UI updates
+│   │   ├── results_display.py  # Bottom results (BF/OD)
+│   │   └── status_indicators.py # Ready/Not Ready indicators
 │   │
 │   ├── statistics_page/        # 📊 Statistics Tab Module
 │   │   ├── __init__.py         # Module exports + setup_statistics_tab()
@@ -1800,6 +1951,33 @@ python structure_diagram.py
 ---
 
 ## 🔄 Version History
+
+### Version 2.3.1 - October 10, 2025 (Latest)
+- ✅ **Modern Inference UI**: Complete redesign matching industry standards
+  - 3-column layout: BF Feed | OD Feed | Right Panel (Overall + Roller Info)
+  - Top panel with 6 sections: Roller type, Date/Time, Mode, Status, Confidence, AI Models
+  - Status indicators above camera feeds (● Not Ready / ● Ready)
+  - Bottom 2-column results: Bigface Result | OD Result
+  - Proper button layout: Start, Stop, Reset, Allow all images
+- ✅ **Removed Threshold Controls**: Moved to Settings tab
+  - Deleted `threshold_panel.py` from inference page
+  - Cleaner inference interface focused on inspection
+  - Threshold adjustment now in Settings tab where it belongs
+- ✅ **Right Panel Integration**: Always visible during inspection
+  - Overall Result at top of right panel
+  - Roller Info below Overall Result
+  - Real-time updates during inspection
+- ✅ **Enhanced Components**: New modular structure
+  - `top_panel.py` - 6-section header panel
+  - `camera_feed.py` - 3-column layout with right panel
+  - `results_display.py` - Bottom 2-column results
+  - `status_indicators.py` - Ready/Not Ready widgets
+  - `controls.py` - All control buttons properly positioned
+- ✅ **Documentation Cleanup**: Single README.md file
+  - Removed `INFERENCE_UI_UPDATE.md`
+  - Removed `LAYOUT_CORRECTION.md`
+  - Removed `UI_CORRECTION_COMPLETE.md`
+  - All documentation consolidated in README.md
 
 ### Version 2.2 - October 10, 2025
 - ✅ **Custom Navigation Bar**: 9-section navbar with color-coded tabs

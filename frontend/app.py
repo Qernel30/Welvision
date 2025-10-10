@@ -18,7 +18,16 @@ from backend import *
 # Import frontend modules
 from .auth_page import setup_login_page, users
 from .navbar import setup_navbar
-from .inference_page import setup_inference_tab, start_camera_feeds, start_inspection, stop_inspection, toggle_allow_all_images
+from .inference_page import (
+    setup_inference_tab, 
+    start_camera_feeds, 
+    start_inspection, 
+    stop_inspection, 
+    toggle_allow_all_images,
+    update_bf_results,
+    update_od_results,
+    update_overall_results
+)
 from .statistics_page import setup_statistics_tab, update_statistics
 from .settings_page import setup_settings_tab, save_thresholds, create_slider, update_threshold, update_model_confidence
 
