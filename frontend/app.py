@@ -17,6 +17,7 @@ from backend import *
 
 # Import frontend modules
 from .auth_page import setup_login_page, users
+from .navbar import setup_navbar
 from .inference_page import setup_inference_tab, start_camera_feeds, start_inspection, stop_inspection, toggle_allow_all_images
 from .statistics_page import setup_statistics_tab, update_statistics
 from .settings_page import setup_settings_tab, save_thresholds, create_slider, update_threshold, update_model_confidence
@@ -29,12 +30,18 @@ class WelVisionApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("WELVISION")
-        self.geometry("1366x768")
+        
+        # Maximize window
+        self.state('zoomed')  # Windows maximized
+        
         self.configure(bg=UI_COLORS['PRIMARY_BG'])
         self.iconbitmap(default="")  # Add your icon path if available
         
-        # Center window on screen
-        self.center_window()
+        # Focus on window
+        self.focus_force()
+        self.lift()
+        self.attributes('-topmost', True)
+        self.after(100, lambda: self.attributes('-topmost', False))
         
         # Initialize variables
         self.current_user = None
@@ -107,37 +114,12 @@ class WelVisionApp(tk.Tk):
                                  command=self.show_login_page)
         logout_button.pack(side=tk.RIGHT, padx=10, pady=5)
         
-        # Create tabs with custom style
-        style = ttk.Style()
-        style.theme_use('default')
-        style.configure('TNotebook.Tab', background=UI_COLORS['PRIMARY_BG'], foreground=UI_COLORS['WHITE'], 
-                       font=('Arial', 12, 'bold'), padding=[20, 10], borderwidth=0)
-        style.map('TNotebook.Tab', background=[('selected', UI_COLORS['SECONDARY_BG'])], 
-                 foreground=[('selected', UI_COLORS['WHITE'])])
-        style.configure('TNotebook', background=UI_COLORS['PRIMARY_BG'], borderwidth=0)
+        # Setup custom navbar
+        content_frame = setup_navbar(self, main_frame)
         
-        tab_control = ttk.Notebook(main_frame)
-        
-        inference_tab = tk.Frame(tab_control, bg=UI_COLORS['PRIMARY_BG'])
-        statistics_tab = tk.Frame(tab_control, bg=UI_COLORS['PRIMARY_BG'])
-        settings_tab = tk.Frame(tab_control, bg=UI_COLORS['PRIMARY_BG'])
-        
-        tab_control.add(inference_tab, text="Inference")
-        tab_control.add(statistics_tab, text="Statistics")
-        tab_control.add(settings_tab, text="Settings")
-        
-        tab_control.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        # Configure tabs using modular functions
-        setup_inference_tab(self, inference_tab)
-        setup_statistics_tab(self, statistics_tab)
-        setup_settings_tab(self, settings_tab)
-        
-        # Start camera feeds
-        start_camera_feeds(self)
-        
-        # Start updating statistics
-        update_statistics(self)
+        # Initialize with INFERENCE tab
+        from .navbar.navbar_manager import _load_tab_content
+        _load_tab_content(self, "INFERENCE")
     
     def initialize_system(self):
         """Initialize system components and shared memory."""

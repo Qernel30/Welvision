@@ -18,64 +18,75 @@ def setup_login_page(app):
     for widget in app.winfo_children():
         widget.destroy()
     
-    # Create login frame with black background
-    login_frame = tk.Frame(app, bg=UI_COLORS['BLACK'], width=500, height=600)
+    # Create login frame with black background - increased size
+    login_frame = tk.Frame(app, bg=UI_COLORS['BLACK'], width=650, height=700)
     login_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
     
-    # Logo
-    logo_label = tk.Label(login_frame, text="WELVISION", font=("Arial", 32, "bold"), 
+    # Logo - increased size
+    logo_label = tk.Label(login_frame, text="WELVISION", font=("Arial", 40, "bold"), 
                          fg=UI_COLORS['WHITE'], bg=UI_COLORS['BLACK'])
-    logo_label.pack(pady=(0, 20))
+    logo_label.pack(pady=(30, 20))
     
-    # Subtitle
-    subtitle_label = tk.Label(login_frame, text="Please sign in to continue", font=("Arial", 14), 
+    # Subtitle - increased size
+    subtitle_label = tk.Label(login_frame, text="Please sign in to continue", font=("Arial", 16), 
                              fg=UI_COLORS['WHITE'], bg=UI_COLORS['BLACK'])
-    subtitle_label.pack(pady=(0, 30))
+    subtitle_label.pack(pady=(0, 40))
     
-    # Role selection
+    # Role selection - increased spacing and font
     role_frame = tk.Frame(login_frame, bg=UI_COLORS['BLACK'])
-    role_frame.pack(pady=(0, 20))
+    role_frame.pack(pady=(0, 30))
     
     app.role_var = tk.StringVar(value="User")
     
     user_rb = tk.Radiobutton(role_frame, text="User", variable=app.role_var, value="User", 
-                            font=("Arial", 12), fg=UI_COLORS['WHITE'], bg=UI_COLORS['BLACK'], 
+                            font=("Arial", 13), fg=UI_COLORS['WHITE'], bg=UI_COLORS['BLACK'], 
                             selectcolor=UI_COLORS['BLACK'])
     admin_rb = tk.Radiobutton(role_frame, text="Admin", variable=app.role_var, value="Admin", 
-                             font=("Arial", 12), fg=UI_COLORS['WHITE'], bg=UI_COLORS['BLACK'], 
+                             font=("Arial", 13), fg=UI_COLORS['WHITE'], bg=UI_COLORS['BLACK'], 
                              selectcolor=UI_COLORS['BLACK'])
     super_admin_rb = tk.Radiobutton(role_frame, text="Super Admin", variable=app.role_var, 
-                                   value="Super Admin", font=("Arial", 12), fg=UI_COLORS['WHITE'], 
+                                   value="Super Admin", font=("Arial", 13), fg=UI_COLORS['WHITE'], 
                                    bg=UI_COLORS['BLACK'], selectcolor=UI_COLORS['BLACK'])
     
-    user_rb.pack(side=tk.LEFT, padx=10)
-    admin_rb.pack(side=tk.LEFT, padx=10)
-    super_admin_rb.pack(side=tk.LEFT, padx=10)
+    user_rb.pack(side=tk.LEFT, padx=15)
+    admin_rb.pack(side=tk.LEFT, padx=15)
+    super_admin_rb.pack(side=tk.LEFT, padx=15)
     
-    # Email
-    email_label = tk.Label(login_frame, text="Email", font=("Arial", 12), 
+    # Email - increased size
+    email_label = tk.Label(login_frame, text="Email", font=("Arial", 13), 
                           fg=UI_COLORS['WHITE'], bg=UI_COLORS['BLACK'], anchor="w")
-    email_label.pack(fill="x", pady=(0, 5))
+    email_label.pack(fill="x", pady=(0, 8))
     
-    app.email_entry = tk.Entry(login_frame, font=("Arial", 12), width=40)
-    app.email_entry.pack(pady=(0, 15), ipady=8)
+    app.email_entry = tk.Entry(login_frame, font=("Arial", 13), width=45)
+    app.email_entry.pack(pady=(0, 20), ipady=10)
     
-    # Password
-    password_label = tk.Label(login_frame, text="Password", font=("Arial", 12), 
+    # Password - increased size
+    password_label = tk.Label(login_frame, text="Password", font=("Arial", 13), 
                              fg=UI_COLORS['WHITE'], bg=UI_COLORS['BLACK'], anchor="w")
-    password_label.pack(fill="x", pady=(0, 5))
+    password_label.pack(fill="x", pady=(0, 8))
     
-    app.password_entry = tk.Entry(login_frame, font=("Arial", 12), width=40, show="*")
-    app.password_entry.pack(pady=(0, 30), ipady=8)
+    app.password_entry = tk.Entry(login_frame, font=("Arial", 13), width=45, show="*")
+    app.password_entry.pack(pady=(0, 35), ipady=10)
     
-    # Sign in button
-    sign_in_button = tk.Button(login_frame, text="Sign In", font=("Arial", 12, "bold"), 
-                              bg=UI_COLORS['PRIMARY'], fg=UI_COLORS['WHITE'], width=20, height=2, 
+    # Sign in button - increased size and stored reference
+    app.sign_in_button = tk.Button(login_frame, text="Sign In", font=("Arial", 14, "bold"), 
+                              bg=UI_COLORS['PRIMARY'], fg=UI_COLORS['WHITE'], width=22, height=2, 
                               command=lambda: authenticate_user(app))
-    sign_in_button.pack(pady=10)
+    app.sign_in_button.pack(pady=15)
     
-    # Bind Enter key to authenticate
-    app.bind("<Return>", lambda event: authenticate_user(app))
+    # Bind Enter key to authenticate with visual feedback
+    def on_enter_press(event):
+        # Visual feedback - button press effect (both relief and color change)
+        original_bg = app.sign_in_button.cget('bg')
+        app.sign_in_button.config(relief=tk.SUNKEN, bg=UI_COLORS['WHITE'], fg=UI_COLORS['PRIMARY'])
+        # Delay authentication to show visual effect, then restore button if it still exists
+        def authenticate_delayed():
+            authenticate_user(app)
+            if app.sign_in_button.winfo_exists():
+                app.sign_in_button.config(relief=tk.RAISED, bg=original_bg, fg=UI_COLORS['WHITE'])
+        app.after(150, authenticate_delayed)
+    
+    app.bind("<Return>", on_enter_press)
 
 
 def authenticate_user(app):

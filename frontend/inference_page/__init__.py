@@ -5,7 +5,7 @@ Inference Page Module - Camera feeds and inspection controls
 from .camera_feed import setup_camera_frames
 from .controls import setup_control_buttons
 from .threshold_panel import setup_threshold_panel
-from .camera_manager import start_camera_feeds
+from .camera_manager import start_camera_feeds, stop_camera_feeds
 from .inspection_control import start_inspection, stop_inspection, toggle_allow_all_images
 
 
@@ -33,6 +33,7 @@ __all__ = [
     'setup_threshold_panel',
     'setup_inference_tab',
     'start_camera_feeds',
+    'stop_camera_feeds',
     'start_inspection',
     'stop_inspection',
     'toggle_allow_all_images'

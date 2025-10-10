@@ -10,20 +10,21 @@
 
 1. [Quick Start](#-quick-start)
 2. [What's New in v2.2](#-whats-new-in-v22)
-3. [Project Overview](#-project-overview)
-4. [Project Structure](#-project-structure)
-5. [Installation](#-installation)
-6. [Usage](#-usage)
-7. [Module Documentation](#-module-documentation)
-8. [Configuration](#%EF%B8%8F-configuration)
-9. [PLC Configuration](#-plc-configuration)
-10. [Image Storage System](#-image-storage-system)
-11. [Inspection Flow](#-inspection-flow)
-12. [Testing](#-testing)
-13. [Deployment](#-deployment)
-14. [Before & After Comparison](#-before--after-comparison)
-15. [Troubleshooting](#-troubleshooting)
-16. [Contributing](#-contributing)
+3. [Navigation Bar System](#-navigation-bar-system)
+4. [Project Overview](#-project-overview)
+5. [Project Structure](#-project-structure)
+6. [Installation](#-installation)
+7. [Usage](#-usage)
+8. [Module Documentation](#-module-documentation)
+9. [Configuration](#%EF%B8%8F-configuration)
+10. [PLC Configuration](#-plc-configuration)
+11. [Image Storage System](#-image-storage-system)
+12. [Inspection Flow](#-inspection-flow)
+13. [Testing](#-testing)
+14. [Deployment](#-deployment)
+15. [Before & After Comparison](#-before--after-comparison)
+16. [Troubleshooting](#-troubleshooting)
+17. [Contributing](#-contributing)
 
 ---
 
@@ -74,6 +75,7 @@ python main.py
 
 ### Key Improvements
 
+✅ **Custom Navigation Bar** - 9-section navbar with color-coded visual feedback  
 ✅ **Delayed PLC Signals** - Lights turn ON only after models are loaded  
 ✅ **Inspection Ready Popup** - Get notified when system is fully operational  
 ✅ **Configurable PLC Mappings** - Change byte/bit indices in `config.py`  
@@ -131,6 +133,167 @@ OD Warmup image YOLO processing complete.
 
 ✅ Inspection Ready: All systems operational!
 ```
+
+---
+
+## 🧭 Navigation Bar System
+
+### Overview
+
+Welvision v2.2 features a **custom navigation bar** with 9 sections, replacing the previous 3-tab notebook interface for better organization and visual feedback.
+
+### Navbar Sections
+
+The navbar includes the following sections (left to right):
+
+1. **INFERENCE** - Real-time camera inspection (existing functionality)
+2. **DATA** - Data management and viewing (placeholder)
+3. **DIAGNOSIS** - System diagnostics (placeholder)
+4. **SETTINGS** - Model confidence settings (existing functionality)
+5. **MODEL MANAGEMENT** - AI model configuration (placeholder)
+6. **USER MANAGEMENT** - User account management (placeholder)
+7. **SYSTEM CHECK** - System health monitoring (placeholder)
+8. **INFO** - Application information and help (implemented)
+9. **EXIT** - Exit application with confirmation (implemented)
+
+### Color Coding
+
+- **Active Tab**: Green (#28a745) - The currently selected tab is highlighted in green
+- **Inactive Tabs**: Blue (#007bff) - All other tabs are in blue
+- **EXIT Button**: Red (#dc3545) - The EXIT button is always red for visibility
+
+### Visual Layout
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  WELVISION              User: Admin                           [Logout]  │
+├─────────┬──────┬──────────┬────────┬──────────────────┬────────────────┤
+│INFERENCE│ DATA │DIAGNOSIS │SETTINGS│MODEL MANAGEMENT  │USER MANAGEMENT │
+│ (GREEN) │(BLUE)│  (BLUE)  │ (BLUE) │     (BLUE)       │    (BLUE)      │
+└─────────┴──────┴──────────┴────────┴──────────────────┴────────────────┘
+                                              ┌──────────┬──────┬──────┐
+                                              │SYSTEM    │ INFO │ EXIT │
+                                              │CHECK     │(BLUE)│ (RED)│
+                                              │(BLUE)    │      │      │
+                                              └──────────┴──────┴──────┘
+```
+
+### Navbar Module Structure
+
+```
+frontend/
+├── navbar/                      # 🧭 Navigation Bar Module
+│   ├── __init__.py             # Module exports
+│   ├── navbar_ui.py            # Navbar UI components (106 lines)
+│   └── navbar_manager.py       # Tab switching logic (98 lines)
+│
+├── data_page/                   # 📊 Data Management Page (Placeholder)
+│   └── __init__.py             # setup_data_tab()
+│
+├── diagnosis_page/              # 🔍 System Diagnosis Page (Placeholder)
+│   └── __init__.py             # setup_diagnosis_tab()
+│
+├── model_management_page/       # 🤖 Model Management Page (Placeholder)
+│   └── __init__.py             # setup_model_management_tab()
+│
+├── user_management_page/        # 👥 User Management Page (Placeholder)
+│   └── __init__.py             # setup_user_management_tab()
+│
+├── system_check_page/           # ✅ System Check Page (Placeholder)
+│   └── __init__.py             # setup_system_check_tab()
+│
+└── info_page/                   # ℹ️ Info Page (Implemented)
+    └── __init__.py             # setup_info_tab()
+```
+
+### How It Works
+
+#### Tab Switching Flow
+```
+User clicks button → switch_tab() → update_navbar_colors() → Clear content → Load new tab
+```
+
+#### Color Update Logic
+```
+For each button:
+  if button == EXIT:
+    → Always RED
+  elif button == active_tab:
+    → GREEN
+  else:
+    → BLUE
+```
+
+#### Exit Button
+```
+User clicks EXIT → Confirmation dialog → Yes → app.on_closing()
+                                       → No  → Return to app
+```
+
+### Configuration
+
+Added two new color constants in `config.py`:
+
+```python
+UI_COLORS = {
+    # ... existing colors
+    'NAVBAR_ACTIVE': "#28a745",  # Green for active tab
+    'NAVBAR_EXIT': "#dc3545"     # Red for EXIT button
+}
+```
+
+### Usage Example
+
+The navbar is automatically created when the main interface is shown:
+
+```python
+# In app.py show_main_interface()
+content_frame = setup_navbar(self, main_frame)
+_load_tab_content(self, "INFERENCE")
+```
+
+### Adding New Navbar Sections
+
+To add a new navbar section:
+
+1. **Create page module** in `frontend/your_page/`
+2. **Add setup function** (e.g., `setup_your_page_tab()`)
+3. **Update navbar_ui.py** to add the button in the sections list
+4. **Update navbar_manager.py** to import and handle the new tab
+5. **Update this documentation**
+
+### Future Development
+
+The following pages are currently placeholders and ready for implementation:
+
+- **DATA**: Image database browsing, inspection history, export options
+- **DIAGNOSIS**: Camera/PLC status, system logs, performance metrics
+- **MODEL MANAGEMENT**: Load/unload models, version control, performance metrics
+- **USER MANAGEMENT**: Add/remove users, role management, activity logs
+- **SYSTEM CHECK**: Hardware status, software version, health indicators
+
+### Benefits
+
+- ✨ **Better Organization**: Clear separation of functionality
+- 🎨 **Visual Feedback**: Active tab highlighted in green
+- 🚪 **Clear Exit**: Red EXIT button always visible
+- 📈 **Scalable**: Easy to add new sections
+- 🎯 **User Friendly**: Intuitive navigation
+
+### Migration from Old System
+
+**Old System (Version 2.1)**
+- Used `ttk.Notebook` with 3 tabs
+- Tabs: Inference, Statistics, Settings
+- No visual indicator for active tab
+- No direct exit button
+
+**New System (Version 2.2)**
+- Custom navbar with 9 sections
+- All sections accessible from navbar
+- Green highlight for active section
+- Red EXIT button with confirmation
+- Statistics moved inside Inference section
 
 ---
 
@@ -1639,6 +1802,13 @@ python structure_diagram.py
 ## 🔄 Version History
 
 ### Version 2.2 - October 10, 2025
+- ✅ **Custom Navigation Bar**: 9-section navbar with color-coded tabs
+  - Replaced ttk.Notebook with custom navbar implementation
+  - Green highlight for active tab, blue for inactive, red for EXIT
+  - 9 sections: INFERENCE, DATA, DIAGNOSIS, SETTINGS, MODEL MANAGEMENT, USER MANAGEMENT, SYSTEM CHECK, INFO, EXIT
+  - Created 6 new placeholder pages ready for development
+  - Modular navbar structure in `frontend/navbar/`
+  - EXIT button with confirmation dialog
 - ✅ **Delayed PLC Signals**: Lights and App Ready signals sent AFTER models loaded
   - Models load first, then PLC signals activated
   - Proper synchronization between model loading and PLC communication

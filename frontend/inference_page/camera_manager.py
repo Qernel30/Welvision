@@ -23,39 +23,68 @@ def start_camera_feeds(app):
     app.bf_thread.start()
 
 
+def stop_camera_feeds(app):
+    """Stop the camera feed update threads."""
+    app.camera_running = False
+    # Give threads time to exit gracefully
+    time.sleep(0.1)
+
+
 def update_od_camera(app):
     """Update OD camera feed on canvas."""
     while app.camera_running:
-        with app.annotated_frame_lock_od:
-            np_frame = np.frombuffer(app.shared_annotated_od.get_obj(), dtype=np.uint8).reshape(app.frame_shape)
-            frame = np_frame.copy()
+        try:
+            # Check if canvas still exists
+            if not hasattr(app, 'od_canvas') or not app.od_canvas.winfo_exists():
+                break
+                
+            with app.annotated_frame_lock_od:
+                np_frame = np.frombuffer(app.shared_annotated_od.get_obj(), dtype=np.uint8).reshape(app.frame_shape)
+                frame = np_frame.copy()
 
-        resized_frame = cv2.resize(frame, (400, 250))
-        # Convert frame to a format compatible with Tkinter
-        img = PIL.Image.fromarray(cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB))
-        imgtk = PIL.ImageTk.PhotoImage(image=img)
+            resized_frame = cv2.resize(frame, (400, 250))
+            # Convert frame to a format compatible with Tkinter
+            img = PIL.Image.fromarray(cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB))
+            imgtk = PIL.ImageTk.PhotoImage(image=img)
 
-        # Update the canvas
-        app.od_canvas.create_image(0, 0, anchor=tk.NW, image=imgtk)
-        app.od_canvas.image = imgtk
+            # Update the canvas - check again before updating
+            if hasattr(app, 'od_canvas') and app.od_canvas.winfo_exists():
+                app.od_canvas.create_image(0, 0, anchor=tk.NW, image=imgtk)
+                app.od_canvas.image = imgtk
+            else:
+                break
 
-        time.sleep(0.03)  # Limit update rate
+            time.sleep(0.03)  # Limit update rate
+        except Exception as e:
+            # Widget was destroyed, exit thread gracefully
+            break
 
 
 def update_bf_camera(app):
     """Update Bigface camera feed on canvas."""
     while app.camera_running:
-        with app.annotated_frame_lock_bigface:
-            np_frame = np.frombuffer(app.shared_annotated_bigface.get_obj(), dtype=np.uint8).reshape(app.frame_shape)
-            frame = np_frame.copy()
+        try:
+            # Check if canvas still exists
+            if not hasattr(app, 'bf_canvas') or not app.bf_canvas.winfo_exists():
+                break
+                
+            with app.annotated_frame_lock_bigface:
+                np_frame = np.frombuffer(app.shared_annotated_bigface.get_obj(), dtype=np.uint8).reshape(app.frame_shape)
+                frame = np_frame.copy()
 
-        resized_frame = cv2.resize(frame, (400, 250))
-        # Convert frame to a format compatible with Tkinter
-        img = PIL.Image.fromarray(cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB))
-        imgtk = PIL.ImageTk.PhotoImage(image=img)
+            resized_frame = cv2.resize(frame, (400, 250))
+            # Convert frame to a format compatible with Tkinter
+            img = PIL.Image.fromarray(cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB))
+            imgtk = PIL.ImageTk.PhotoImage(image=img)
 
-        # Update the canvas
-        app.bf_canvas.create_image(0, 0, anchor=tk.NW, image=imgtk)
-        app.bf_canvas.image = imgtk
+            # Update the canvas - check again before updating
+            if hasattr(app, 'bf_canvas') and app.bf_canvas.winfo_exists():
+                app.bf_canvas.create_image(0, 0, anchor=tk.NW, image=imgtk)
+                app.bf_canvas.image = imgtk
+            else:
+                break
 
-        time.sleep(0.03)  # Limit update rate
+            time.sleep(0.03)  # Limit update rate
+        except Exception as e:
+            # Widget was destroyed, exit thread gracefully
+            break

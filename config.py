@@ -100,5 +100,7 @@ UI_COLORS = {
     'DANGER': "#dc3545",
     'PRIMARY': "#007bff",
     'WHITE': "white",
-    'BLACK': "black"
+    'BLACK': "black",
+    'NAVBAR_ACTIVE': "#28a745",  # Green for active tab
+    'NAVBAR_EXIT': "#dc3545"     # Red for EXIT button
 }
