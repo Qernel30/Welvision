@@ -11,6 +11,28 @@ PLC_CONFIG = {
     'DB_NUMBER': 86
 }
 
+# PLC Sensors and Actions Mapping
+# All byte and bool indices for reading sensors and triggering actions
+PLC_SENSORS = {
+    # Input Sensors (Reading from PLC)
+    'SENSORS': {
+        'bigface_presence': {'byte': 0, 'bit': 1},
+        'bigface': {'byte': 0, 'bit': 2},
+        'od': {'byte': 0, 'bit': 0},
+        'od_presence': {'byte': 1, 'bit': 4},
+        'head_classification_sensor': {'byte': 2, 'bit': 2}
+    },
+    # Output Actions (Writing to PLC)
+    'ACTIONS': {
+        'lights': {'byte': 1, 'bit': 6},
+        'app_ready': {'byte': 1, 'bit': 7},
+        'accept_bigface': {'byte': 1, 'bit': 0},
+        'reject_bigface': {'byte': 1, 'bit': 1},
+        'accept_od': {'byte': 1, 'bit': 2},
+        'reject_od': {'byte': 1, 'bit': 3}
+    }
+}
+
 # Camera Configuration
 CAMERA_CONFIG = {
     'BIGFACE_NAME': "DFK 33GP1300e [BF]",

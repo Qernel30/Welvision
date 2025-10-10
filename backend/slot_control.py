@@ -5,7 +5,6 @@ Slot control module for handling roller accept/reject mechanisms
 
 def handle_slot_control_bigface(roller_queue_bigface, shared_data, command_queue):
     """Control slot mechanism based on second proximity sensor."""
-    print("Starting slot control...")
 
     a = False
     while True:

@@ -1,7 +1,7 @@
 # 🎯 Welvision - Roller Inspection System
 
-**Version**: 2.1 - Modular Frontend & Image Management  
-**Last Updated**: October 9, 2025  
+**Version**: 2.2 - PLC Configuration & Model-Ready Inspection  
+**Last Updated**: October 10, 2025  
 **Status**: ✅ Production Ready
 
 ---
@@ -9,18 +9,21 @@
 ## 📖 Table of Contents
 
 1. [Quick Start](#-quick-start)
-2. [Project Overview](#-project-overview)
-3. [Project Structure](#-project-structure)
-4. [Installation](#-installation)
-5. [Usage](#-usage)
-6. [Module Documentation](#-module-documentation)
-7. [Configuration](#%EF%B8%8F-configuration)
-8. [Image Storage System](#-image-storage-system)
-9. [Testing](#-testing)
-10. [Deployment](#-deployment)
-11. [Before & After Comparison](#-before--after-comparison)
-12. [Troubleshooting](#-troubleshooting)
-13. [Contributing](#-contributing)
+2. [What's New in v2.2](#-whats-new-in-v22)
+3. [Project Overview](#-project-overview)
+4. [Project Structure](#-project-structure)
+5. [Installation](#-installation)
+6. [Usage](#-usage)
+7. [Module Documentation](#-module-documentation)
+8. [Configuration](#%EF%B8%8F-configuration)
+9. [PLC Configuration](#-plc-configuration)
+10. [Image Storage System](#-image-storage-system)
+11. [Inspection Flow](#-inspection-flow)
+12. [Testing](#-testing)
+13. [Deployment](#-deployment)
+14. [Before & After Comparison](#-before--after-comparison)
+15. [Troubleshooting](#-troubleshooting)
+16. [Contributing](#-contributing)
 
 ---
 
@@ -38,6 +41,96 @@ python main.py
 - CUDA-capable GPU (for YOLO inference)
 - Two cameras connected (indices 0 and 1)
 - Siemens S7 PLC (optional, for production)
+
+### Login Credentials
+
+| Role | Email | Password |
+|------|-------|----------|
+| **User** | user@example.com | user123 |
+| **Admin** | admin@example.com | admin123 |
+| **Super Admin** | superadmin@example.com | super123 |
+
+### Starting Inspection
+
+1. **Login** with your credentials
+2. Go to **Inference** tab
+3. Click **"Start Inspection"** button
+4. Wait for models to load (console output shows progress)
+5. **Popup will appear** when inspection is ready:
+   ```
+   ✅ Inspection has started successfully!
+   
+   • BF Model: Loaded on GPU
+   • OD Model: Loaded on GPU
+   • PLC: Connected and Ready
+   • Lights: ON
+   ```
+6. Click **OK** to dismiss popup
+7. System is now fully operational!
+
+---
+
+## 🆕 What's New in v2.2
+
+### Key Improvements
+
+✅ **Delayed PLC Signals** - Lights turn ON only after models are loaded  
+✅ **Inspection Ready Popup** - Get notified when system is fully operational  
+✅ **Configurable PLC Mappings** - Change byte/bit indices in `config.py`  
+✅ **Better Synchronization** - Models → PLC → User feedback
+
+### New Inspection Flow
+
+**Before v2.2:**
+```
+Click "Start" → PLC Lights ON Immediately → Models Load → Inspection Starts
+```
+
+**After v2.2:**
+```
+Click "Start" 
+  ↓
+Models Start Loading (in separate processes)
+  ↓
+BF Model Loaded → Set bf_model_loaded = True
+  ↓
+OD Model Loaded → Set od_model_loaded = True
+  ↓
+PLC Waits for Both Flags
+  ↓
+PLC Sends Lights ON + App Ready → Set plc_ready = True
+  ↓
+Frontend Monitors All Flags
+  ↓
+Show Popup: "Inspection Started Successfully!"
+```
+
+### Console Output Example
+
+```
+🧹 GPU cache cleared successfully.
+🔄 Reloading Bigface model...
+   ✓ Bigface model loaded to GPU
+🔄 Reloading OD model...
+   ✓ OD model loaded to GPU
+🚀 Inspection processes started. Waiting for models to load...
+
+✅ PLC Communication: Connected to PLC.
+⏳ PLC Communication: Waiting for BF and OD models to load on GPU...
+
+BF Model now loaded in GPU
+✅ BF Model loaded flag set to True
+BF Warmup image YOLO processing complete.
+
+OD Model now loaded in GPU
+✅ OD Model loaded flag set to True
+OD Warmup image YOLO processing complete.
+
+✅ PLC Communication: Both models loaded on GPU!
+✅ PLC Communication: Lights ON & Application Ready signal sent.
+
+✅ Inspection Ready: All systems operational!
+```
 
 ---
 
@@ -497,9 +590,63 @@ PLC_CONFIG = {
     'IP': '172.17.8.17',      # PLC IP address
     'RACK': 0,                 # PLC rack number
     'SLOT': 1,                 # PLC slot number
-    'DB_NUMBER': 1             # Data block number
+    'DB_NUMBER': 86            # Data block number
 }
 ```
+
+---
+
+## 🔌 PLC Configuration
+
+### Configurable PLC Mappings (NEW in v2.2)
+
+All PLC byte and bit indices are now centralized in `config.py` for easy modification:
+
+```python
+# PLC Sensors and Actions Mapping
+PLC_SENSORS = {
+    # Input Sensors (Reading from PLC)
+    'SENSORS': {
+        'bigface_presence': {'byte': 0, 'bit': 1},
+        'bigface': {'byte': 0, 'bit': 2},
+        'od': {'byte': 0, 'bit': 0},
+        'od_presence': {'byte': 1, 'bit': 4},
+        'head_classification_sensor': {'byte': 2, 'bit': 2}
+    },
+    # Output Actions (Writing to PLC)
+    'ACTIONS': {
+        'lights': {'byte': 1, 'bit': 6},
+        'app_ready': {'byte': 1, 'bit': 7},
+        'accept_bigface': {'byte': 1, 'bit': 0},
+        'reject_bigface': {'byte': 1, 'bit': 1},
+        'accept_od': {'byte': 1, 'bit': 2},
+        'reject_od': {'byte': 1, 'bit': 3}
+    }
+}
+```
+
+### Benefits
+
+✅ **No Hardcoded Values** - All byte/bit indices in one place  
+✅ **Easy Modifications** - Change mappings without touching code  
+✅ **Self-Documenting** - Clear sensor and action names  
+✅ **Centralized** - One location for all PLC configuration  
+
+### How to Modify PLC Mappings
+
+**Example: Change Lights Signal to Byte 2, Bit 5**
+
+Edit `config.py`:
+```python
+PLC_SENSORS = {
+    'ACTIONS': {
+        'lights': {'byte': 2, 'bit': 5},  # Changed from byte 1, bit 6
+        # ... other actions
+    }
+}
+```
+
+**That's it!** All references will automatically use the new mapping.
 
 ### Camera Configuration
 ```python
@@ -876,6 +1023,123 @@ IMAGE_LIMIT_PER_DIRECTORY = 999999  # Effectively unlimited
 
 ---
 
+## 🔄 Inspection Flow
+
+### Complete Startup Flow (v2.2)
+
+```
+User Clicks "Start Inspection"
+         ↓
+Reset Model Flags (bf_model_loaded, od_model_loaded, plc_ready = False)
+         ↓
+Create & Start All Processes
+  • PLC Communication Process
+  • BF Camera Capture Process
+  • OD Camera Capture Process
+  • BF YOLO Processing Process
+  • OD YOLO Processing Process
+  • BF Slot Control Process
+  • OD Slot Control Process
+         ↓
+┌────────────────────────────────────┐
+│   PARALLEL EXECUTION BEGINS        │
+└────────────────────────────────────┘
+         ↓
+┌─────────────────┐    ┌─────────────────┐
+│ BF YOLO Process │    │ OD YOLO Process │
+│ • Load models   │    │ • Load model    │
+│ • Transfer GPU  │    │ • Transfer GPU  │
+│ • Run warmup    │    │ • Run warmup    │
+└────────┬────────┘    └────────┬────────┘
+         ↓                      ↓
+  bf_model_loaded = True   od_model_loaded = True
+         │                      │
+         └──────────┬───────────┘
+                    ↓
+         PLC Communication Process
+         • Connected to PLC
+         • Waiting for both model flags...
+         • while not (bf_model_loaded AND od_model_loaded):
+         •     sleep(0.1)
+                    ↓
+         Both Models Loaded!
+         • Read PLC data
+         • Set Lights ON (byte 1, bit 6)
+         • Set App Ready ON (byte 1, bit 7)
+         • Write to PLC
+                    ↓
+         plc_ready = True
+                    ↓
+         Monitor Thread Detects All Flags
+         • bf_model_loaded = True ✓
+         • od_model_loaded = True ✓
+         • plc_ready = True ✓
+                    ↓
+         Show Popup Message
+         ╔═══════════════════════════════════╗
+         ║  Inspection Started              ║
+         ║  ✅ BF Model: Loaded on GPU      ║
+         ║  ✅ OD Model: Loaded on GPU      ║
+         ║  ✅ PLC: Connected and Ready     ║
+         ║  ✅ Lights: ON                   ║
+         ╚═══════════════════════════════════╝
+                    ↓
+         INSPECTION FULLY OPERATIONAL
+```
+
+### Key Improvements
+
+**1. Proper Synchronization**
+```
+OLD: PLC signals sent → Models still loading → Inconsistent state
+NEW: Models loaded → PLC signals sent → Consistent state
+```
+
+**2. User Feedback**
+```
+OLD: No feedback, user unsure if system is ready
+NEW: Clear popup message when fully operational
+```
+
+**3. Flag-Based Coordination**
+```python
+bf_model_loaded   # True when BF model is on GPU
+od_model_loaded   # True when OD model is on GPU
+plc_ready         # True when PLC signals sent
+```
+
+**4. Non-Blocking UI**
+- Monitor thread runs separately, doesn't freeze UI
+- Popup shown on main thread via `app.after()`
+
+### Stop Inspection Flow
+
+```
+User Clicks "Stop Inspection"
+         ↓
+Connect to PLC
+         ↓
+Read PLC Data
+         ↓
+Turn OFF Signals (Using Config)
+  • Lights OFF (byte 1, bit 6)
+  • App Ready OFF (byte 1, bit 7)
+         ↓
+Terminate All Processes
+  • Stop PLC communication
+  • Stop camera captures
+  • Stop YOLO processing
+  • Stop slot control
+         ↓
+Clear GPU Memory
+  • Delete model references
+  • torch.cuda.empty_cache()
+         ↓
+INSPECTION STOPPED
+```
+
+---
+
 ## 🧪 Testing
 
 ### Test Imports
@@ -1063,6 +1327,64 @@ ls frontend/__init__.py
 cd Welvision-Rebuild
 python main.py
 ```
+
+---
+
+### Popup Doesn't Appear (v2.2)
+
+**Problem**: Inspection starts but popup message doesn't show
+
+**Cause**: Models not loading properly or PLC not connecting
+
+**Check**:
+1. Console output for errors
+2. GPU availability: `nvidia-smi`
+3. Model files exist in `models/` folder
+4. PLC IP is reachable: `ping 172.17.8.17`
+
+**Solution**:
+- Check console for which model failed to load
+- Verify PLC connection settings in `config.py`
+- Click "Stop Inspection" and try again
+- Look for flags: `bf_model_loaded`, `od_model_loaded`, `plc_ready`
+
+---
+
+### Lights Don't Turn On (v2.2)
+
+**Problem**: PLC lights don't activate after starting inspection
+
+**Cause**: Model loading issue or PLC configuration problem
+
+**Check**:
+1. Console shows "Both models loaded on GPU!"
+2. PLC byte/bit indices in `PLC_SENSORS` configuration
+3. Network connectivity to PLC
+4. Console output for PLC connection errors
+
+**Solution**:
+- Wait for models to finish loading (check console)
+- Verify `PLC_SENSORS` mappings in `config.py`
+- Check physical PLC connection
+- Test PLC with TIA Portal or other PLC software
+
+---
+
+### Models Taking Too Long to Load
+
+**Problem**: Startup takes longer than expected
+
+**Normal Timeline**:
+- BF Model: ~5 seconds
+- OD Model: ~5 seconds
+- Warmup frames: ~2 seconds each
+- Total: ~15-20 seconds
+
+**If longer than 30 seconds**:
+- Check GPU memory: `nvidia-smi`
+- Close other GPU applications
+- Restart application
+- Check model file sizes (corrupted files load slowly)
 
 ---
 
@@ -1316,6 +1638,26 @@ python structure_diagram.py
 
 ## 🔄 Version History
 
+### Version 2.2 - October 10, 2025
+- ✅ **Delayed PLC Signals**: Lights and App Ready signals sent AFTER models loaded
+  - Models load first, then PLC signals activated
+  - Proper synchronization between model loading and PLC communication
+  - Prevents false "ready" state
+- ✅ **Configurable PLC Mappings**: All PLC byte/bit indices in `config.py`
+  - Added `PLC_SENSORS` configuration dictionary
+  - No more hardcoded byte/bit indices in code
+  - Easy to modify PLC mappings without touching code
+  - Self-documenting structure
+- ✅ **Inspection Ready Popup**: User notification when inspection fully operational
+  - Popup shows when all systems are ready
+  - Displays BF/OD model status, PLC connection, lights status
+  - Non-blocking UI with separate monitor thread
+- ✅ **Model Loading Flags**: Track when models are loaded on GPU
+  - `bf_model_loaded` flag for Bigface model
+  - `od_model_loaded` flag for OD model
+  - `plc_ready` flag for PLC signals sent
+  - Flag-based coordination between processes
+
 ### Version 2.1 - October 9, 2025
 - ✅ **Frontend Modularization**: Page-based module structure
   - Created `inference_page/`, `statistics_page/`, `settings_page/`, `auth_page/`
@@ -1387,9 +1729,9 @@ pip freeze > requirements.txt
 
 ---
 
-**Last Updated**: October 9, 2025  
+**Last Updated**: October 10, 2025  
 **Status**: ✅ Production Ready  
-**Version**: 2.1 - Modular Frontend & Image Management
+**Version**: 2.2 - PLC Configuration & Model-Ready Inspection
 
 ---
 
@@ -1397,6 +1739,6 @@ pip freeze > requirements.txt
 
 ## 🌟 Welvision - Professional Roller Inspection System 🌟
 
-**Made with ❤️ by the Welvision Team**
+**Made with ❤️ by the iQube**
 
 </div>

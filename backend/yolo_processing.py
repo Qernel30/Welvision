@@ -1,6 +1,7 @@
 """
 YOLO model processing for defect detection
 """
+import gc
 import cv2
 import numpy as np
 import os
@@ -33,7 +34,9 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
             model_bf.to("cuda")
             model_head.to("cuda")
             print("BF Model now loaded in GPU")
-
+            
+            # Set flag that BF model is loaded
+            shared_data['bf_model_loaded'] = True
     except:
         print("Model is not loaded exiting process")
         return
@@ -105,7 +108,10 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
                 np_frame = np.frombuffer(shared_frame_bigface.get_obj(), dtype=np.uint8).reshape(frame_shape)
                 frame = np_frame.copy()
 
-            results = model_head.predict(frame, device=0, conf=0.7, verbose=True, half=True, agnostic_nms=True)
+            results = model_head.predict(frame, device=0, conf=0.7, verbose=False, half=True, agnostic_nms=True)
+            # ✅ Add cache clearing
+            torch.cuda.empty_cache()
+            gc.collect()
 
             boxes = results[0].boxes.xyxy.cpu().numpy()  # shape: [N, 4]
             classes = results[0].boxes.cls.cpu().numpy()  # class IDs
@@ -174,6 +180,9 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
             roller_class_index = next((key for key, value in model_bf.names.items() if value == 'roller'), None)
 
             results = model_bf.predict(frame, device=0, conf=bf_conf, verbose=False, half=True, agnostic_nms=True)
+            # ✅ Add cache clearing
+            torch.cuda.empty_cache()
+            gc.collect()
 
             boxes = results[0].boxes
 
@@ -295,7 +304,9 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
         if torch.cuda.is_available():
             model_od.to("cuda")
             print("OD Model now loaded in GPU")
-
+            
+            # Set flag that OD model is loaded
+            shared_data['od_model_loaded'] = True
     except:
         print("Model is not loaded exiting process")
         return
@@ -336,7 +347,10 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
             with frame_lock_od:
                 np_frame = np.frombuffer(shared_frame_od.get_obj(), dtype=np.uint8).reshape(frame_shape)
 
-            results = model_od.predict(np_frame, device=0, conf=od_conf, verbose=False)
+            results = model_od.predict(np_frame, device=0, conf=od_conf, verbose=False, half=True, agnostic_nms=True)
+            # ✅ Add cache clearing
+            torch.cuda.empty_cache()
+            gc.collect()
             detections = [
                 ("roller" if int(box[-1]) == 5 else "defect", int(box[0]), int(box[1]), int(box[2]), int(box[3]), int(box[-1]) , float(box[-2]) )
                 for box in results[0].boxes.data

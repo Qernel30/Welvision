@@ -4,10 +4,12 @@ Inspection Control Module - Start/Stop inspection operations
 import gc
 import torch
 import snap7
+import tkinter.messagebox as messagebox
+import threading
 from snap7.util import set_bool
 from snap7.type import Areas
 from multiprocessing import Process
-from config import CAMERA_CONFIG
+from config import CAMERA_CONFIG, PLC_SENSORS, PLC_CONFIG
 from backend import (
     plc_communication, 
     capture_frames_bigface, 
@@ -26,7 +28,35 @@ def clear_gpu_cache():
     gc.collect()                   # Python garbage collector
     torch.cuda.empty_cache()       # Free cached GPU memory
     torch.cuda.synchronize()       # Wait for all kernels to finish
-    print("🧹 GPU cache cleared successfully.")
+
+
+def monitor_inspection_ready(app):
+    """
+    Monitor when inspection is ready (models loaded + PLC ready) and show popup.
+    Runs in a separate thread to avoid blocking UI.
+    
+    Args:
+        app: Main application instance
+    """
+    import time
+    
+    # Wait for both model flags to be set
+    while not (app.shared_data.get('bf_model_loaded', False) and app.shared_data.get('od_model_loaded', False)):
+        time.sleep(0.1)
+    
+    # Wait for PLC ready flag
+    while not app.shared_data.get('plc_ready', False):
+        time.sleep(0.1)
+    
+    # Show success message on main thread
+    app.after(0, lambda: messagebox.showinfo(
+        "Inspection Started", 
+        "✅ Inspection has started successfully!\n\n"
+        "• BF Model: Loaded on GPU\n"
+        "• OD Model: Loaded on GPU\n"
+        "• PLC: Connected and Ready\n"
+        "• Lights: ON"
+    ))
 
 
 def create_processes(app):
@@ -38,7 +68,7 @@ def create_processes(app):
     """
     app.plc_process = Process(
         target=plc_communication,
-        args=(app.PLC_IP, app.RACK, app.SLOT, app.DB_NUMBER, app.shared_data, app.command_queue),
+        args=(app.PLC_IP, app.RACK, app.SLOT, app.DB_NUMBER, app.shared_data, app.command_queue, PLC_SENSORS),
         daemon=True
     )
 
@@ -65,6 +95,11 @@ def start_inspection(app):
 
     # Clear GPU cache before starting
     clear_gpu_cache()
+    
+    # Reset model loaded flags
+    app.shared_data['bf_model_loaded'] = False
+    app.shared_data['od_model_loaded'] = False
+    app.shared_data['plc_ready'] = False
 
     # Reload models if they were deleted
     if not hasattr(app, 'model_bigface') or app.model_bigface is None:
@@ -96,7 +131,10 @@ def start_inspection(app):
     for process in app.processes:
         process.start()
     
-    print("✅ Inspection started successfully.")
+    # Start monitoring thread for inspection ready popup
+    monitor_thread = threading.Thread(target=monitor_inspection_ready, args=(app,), daemon=True)
+    monitor_thread.start()
+    
 
 
 def stop_inspection(app):
@@ -120,10 +158,14 @@ def stop_inspection(app):
         print(f"❌ PLC Communication: Failed to connect to PLC. Error: {e}")
         return
 
+    # Get action mappings from config
+    actions = PLC_SENSORS['ACTIONS']
+    
     data = plc_client.read_area(Areas.DB, app.DB_NUMBER, 0, 2)  # Read 2 bytes
 
-    set_bool(data, byte_index=1, bool_index=6, value=False)  # Turn OFF specific bit
-    set_bool(data, byte_index=1, bool_index=7, value=False)  # Turn OFF another bit
+    # Turn OFF lights and app ready signals using config
+    set_bool(data, byte_index=actions['lights']['byte'], bool_index=actions['lights']['bit'], value=False)
+    set_bool(data, byte_index=actions['app_ready']['byte'], bool_index=actions['app_ready']['bit'], value=False)
 
     # Write back the modified data to DB
     plc_client.write_area(Areas.DB, app.DB_NUMBER, 0, data)

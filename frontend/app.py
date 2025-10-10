@@ -22,7 +22,7 @@ from .statistics_page import setup_statistics_tab, update_statistics
 from .settings_page import setup_settings_tab, save_thresholds, create_slider, update_threshold, update_model_confidence
 
 # Import configuration
-from config import PLC_CONFIG, CAMERA_CONFIG, DEFECT_THRESHOLDS, DEFAULT_CONFIDENCE, UI_COLORS, IMAGE_STORAGE_PATHS, IMAGE_LIMIT_PER_DIRECTORY, WARMUP_IMAGES
+from config import PLC_CONFIG, PLC_SENSORS, CAMERA_CONFIG, DEFECT_THRESHOLDS, DEFAULT_CONFIDENCE, UI_COLORS, IMAGE_STORAGE_PATHS, IMAGE_LIMIT_PER_DIRECTORY, WARMUP_IMAGES
 
 
 class WelVisionApp(tk.Tk):
@@ -146,7 +146,6 @@ class WelVisionApp(tk.Tk):
         self.SLOT = PLC_CONFIG['SLOT']
         self.DB_NUMBER = PLC_CONFIG['DB_NUMBER']
 
-        print("Loading YOLO model...")
         self.model_bigface = YOLO(r"models/BF_sr.pt")
         self.model_od = YOLO(r"models/OD_sr.pt")
 
@@ -161,7 +160,11 @@ class WelVisionApp(tk.Tk):
         self.shared_data['od'] = False
         self.shared_data['bigface_presence'] = False
         self.shared_data['od_presence'] = False
+        self.shared_data["head_classification_sensor"] = False
         self.shared_data['allow_all_images'] = False  # New flag for all images mode
+        self.shared_data['bf_model_loaded'] = False  # Flag for Bigface model loaded
+        self.shared_data['od_model_loaded'] = False  # Flag for OD model loaded
+        self.shared_data['plc_ready'] = False  # Flag for PLC ready signal sent
         self.shared_data['image_storage_paths'] = IMAGE_STORAGE_PATHS
         self.shared_data['image_limit'] = IMAGE_LIMIT_PER_DIRECTORY
         self.shared_data['warmup_images'] = WARMUP_IMAGES
