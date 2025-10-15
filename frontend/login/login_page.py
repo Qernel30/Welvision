@@ -1,14 +1,20 @@
 """
-Login Page UI Component
+Login Page UI Component - Main Controller
+Orchestrates all login page components
 """
 
 import tkinter as tk
-from ..utils.styles import Colors, Fonts
-from ..utils.auth import authenticate_user
+from .window_config import WindowConfig
+from .login_form import LoginForm
+from .login_header import LoginHeader
+from .role_selector import RoleSelector
+from .input_fields import InputFields
+from .signin_button import SignInButton
+from .auth_handler import AuthHandler
 
 
 class LoginPage:
-    """Login page for user authentication."""
+    """Main login page controller that orchestrates all components."""
     
     def __init__(self, parent, on_login_success):
         """
@@ -21,140 +27,84 @@ class LoginPage:
         """
         self.parent = parent
         self.on_login_success = on_login_success
-        self.frame = None
+        
+        # Components
+        self.login_form = None
+        self.role_selector = None
+        self.input_fields = None
+        self.signin_button = None
+        
+        # Configure window to open maximized and focused
+        WindowConfig.configure(self.parent)
         
     def show(self):
         """Display the login page."""
         # Clear any existing widgets
+        self._clear_widgets()
+        
+        # Create login form structure
+        self._build_login_form()
+        
+        # Bind Enter key to authenticate with visual feedback
+        self.parent.bind("<Return>", lambda event: self._on_enter_key_press())
+        
+    def _clear_widgets(self):
+        """Clear any existing widgets from parent."""
         for widget in self.parent.winfo_children():
             widget.destroy()
+    
+    def _build_login_form(self):
+        """Build the complete login form with all components."""
+        # Create main form container
+        self.login_form = LoginForm(self.parent)
+        container = self.login_form.create()
         
-        # Create login frame with black background
-        self.frame = tk.Frame(self.parent, bg=Colors.BLACK, width=500, height=600)
-        self.frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+        # Create header (logo and subtitle)
+        LoginHeader.create(container)
         
-        # Logo
-        logo_label = tk.Label(
-            self.frame, 
-            text="WELVISION", 
-            font=Fonts.TITLE, 
-            fg=Colors.WHITE, 
-            bg=Colors.BLACK
-        )
-        logo_label.pack(pady=(0, 20))
+        # Create role selector
+        self.role_selector = RoleSelector(container)
+        self.role_selector.create()
         
-        # Subtitle
-        subtitle_label = tk.Label(
-            self.frame, 
-            text="Please sign in to continue", 
-            font=Fonts.LABEL, 
-            fg=Colors.WHITE, 
-            bg=Colors.BLACK
-        )
-        subtitle_label.pack(pady=(0, 30))
+        # Create input fields
+        self.input_fields = InputFields(container)
+        self.input_fields.create()
         
-        # Role selection
-        role_frame = tk.Frame(self.frame, bg=Colors.BLACK)
-        role_frame.pack(pady=(0, 20))
+        # Create sign-in button
+        self.signin_button = SignInButton(container, self._authenticate)
+        self.signin_button.create()
         
-        self.role_var = tk.StringVar(value="User")
-        
-        user_rb = tk.Radiobutton(
-            role_frame, 
-            text="User", 
-            variable=self.role_var, 
-            value="User",
-            font=Fonts.TEXT, 
-            fg=Colors.WHITE, 
-            bg=Colors.BLACK, 
-            selectcolor=Colors.BLACK
-        )
-        admin_rb = tk.Radiobutton(
-            role_frame, 
-            text="Admin", 
-            variable=self.role_var, 
-            value="Admin",
-            font=Fonts.TEXT, 
-            fg=Colors.WHITE, 
-            bg=Colors.BLACK, 
-            selectcolor=Colors.BLACK
-        )
-        super_admin_rb = tk.Radiobutton(
-            role_frame, 
-            text="Super Admin", 
-            variable=self.role_var, 
-            value="Super Admin",
-            font=Fonts.TEXT, 
-            fg=Colors.WHITE, 
-            bg=Colors.BLACK, 
-            selectcolor=Colors.BLACK
-        )
-        
-        user_rb.pack(side=tk.LEFT, padx=10)
-        admin_rb.pack(side=tk.LEFT, padx=10)
-        super_admin_rb.pack(side=tk.LEFT, padx=10)
-        
-        # Email
-        email_label = tk.Label(
-            self.frame, 
-            text="Email", 
-            font=Fonts.TEXT, 
-            fg=Colors.WHITE, 
-            bg=Colors.BLACK, 
-            anchor="w"
-        )
-        email_label.pack(fill="x", pady=(0, 5))
-        
-        self.email_entry = tk.Entry(self.frame, font=Fonts.TEXT, width=40)
-        self.email_entry.pack(pady=(0, 15), ipady=8)
-        
-        # Password
-        password_label = tk.Label(
-            self.frame, 
-            text="Password", 
-            font=Fonts.TEXT, 
-            fg=Colors.WHITE, 
-            bg=Colors.BLACK, 
-            anchor="w"
-        )
-        password_label.pack(fill="x", pady=(0, 5))
-        
-        self.password_entry = tk.Entry(self.frame, font=Fonts.TEXT, width=40, show="*")
-        self.password_entry.pack(pady=(0, 30), ipady=8)
-        
-        # Sign in button
-        sign_in_button = tk.Button(
-            self.frame, 
-            text="Sign In", 
-            font=Fonts.TEXT_BOLD,
-            bg=Colors.PRIMARY_BLUE, 
-            fg=Colors.WHITE, 
-            width=20, 
-            height=2,
-            command=self._authenticate
-        )
-        sign_in_button.pack(pady=10)
-        
-        # Bind Enter key to authenticate
-        self.parent.bind("<Return>", lambda event: self._authenticate())
-        
+    def _on_enter_key_press(self):
+        """Handle Enter key press with visual button feedback."""
+        # Trigger button press animation with authentication callback
+        if self.signin_button and self.signin_button.button:
+            self.signin_button.trigger_press_animation(callback=self._authenticate)
+        else:
+            # Fallback if button not available
+            self._authenticate()
+    
     def _authenticate(self):
         """Handle authentication logic."""
-        email = self.email_entry.get().strip()
-        password = self.password_entry.get().strip()
-        role = self.role_var.get()
+        # Get credentials and role
+        email, password = self.input_fields.get_credentials()
+        role = self.role_selector.role_var.get()
         
-        if authenticate_user(email, password, role):
+        # Attempt authentication
+        if AuthHandler.authenticate(email, password, role):
             # Clear the login page
-            if self.frame:
-                self.frame.destroy()
+            self._cleanup()
             # Call the success callback
             self.on_login_success(email, role)
         else:
-            import tkinter.messagebox as messagebox
-            messagebox.showerror("Login Failed", "Invalid email, password, or role.")
+            # Show error message
+            AuthHandler.show_error()
+    
+    def _cleanup(self):
+        """Clean up login form resources."""
+        if self.login_form:
+            self.login_form.destroy()
+            self.login_form = None
     
     def hide(self):
         """Hide the login page."""
-        if self.frame:
-            self.frame.destroy()
+        self._cleanup()

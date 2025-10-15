@@ -70,16 +70,28 @@ class CameraFeed:
         if self.canvas is None:
             return
         
-        # Resize frame to fit canvas
-        resized_frame = cv2.resize(frame, (AppConfig.CAMERA_WIDTH, AppConfig.CAMERA_HEIGHT))
-        
-        # Convert from BGR to RGB
-        img = PIL.Image.fromarray(cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB))
-        imgtk = PIL.ImageTk.PhotoImage(image=img)
-        
-        # Update canvas
-        self.canvas.create_image(0, 0, anchor=tk.NW, image=imgtk)
-        self.canvas.image = imgtk  # Keep a reference to prevent garbage collection
+        try:
+            # Check if canvas still exists (not destroyed)
+            if not self.canvas.winfo_exists():
+                return
+            
+            # Resize frame to fit canvas
+            resized_frame = cv2.resize(frame, (AppConfig.CAMERA_WIDTH, AppConfig.CAMERA_HEIGHT))
+            
+            # Convert from BGR to RGB
+            img = PIL.Image.fromarray(cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB))
+            imgtk = PIL.ImageTk.PhotoImage(image=img)
+            
+            # Update canvas
+            self.canvas.create_image(0, 0, anchor=tk.NW, image=imgtk)
+            self.canvas.image = imgtk  # Keep a reference to prevent garbage collection
+        except tk.TclError:
+            # Widget has been destroyed, stop updating
+            return
+        except Exception as e:
+            # Handle any other exceptions silently
+            print(f"Error updating camera feed: {e}")
+            return
 
 
 class CameraFeedManager:

@@ -51,32 +51,50 @@ class InferenceTab:
         od_feed = self.camera_manager.get_feed('od')
         
         while self.app.camera_running:
-            with self.app.annotated_frame_lock_od:
-                np_frame = np.frombuffer(
-                    self.app.shared_annotated_od.get_obj(), 
-                    dtype=np.uint8
-                ).reshape(self.app.frame_shape)
-                frame = np_frame.copy()
+            try:
+                # Check if feed still exists
+                if od_feed is None or od_feed.canvas is None:
+                    break
+                
+                with self.app.annotated_frame_lock_od:
+                    np_frame = np.frombuffer(
+                        self.app.shared_annotated_od.get_obj(), 
+                        dtype=np.uint8
+                    ).reshape(self.app.frame_shape)
+                    frame = np_frame.copy()
 
-            # Update the camera feed
-            od_feed.update_frame(frame)
-            time.sleep(AppConfig.FRAME_UPDATE_RATE)
+                # Update the camera feed
+                od_feed.update_frame(frame)
+                time.sleep(AppConfig.FRAME_UPDATE_RATE)
+            except Exception as e:
+                # Handle exceptions and exit gracefully
+                print(f"OD camera thread error: {e}")
+                break
 
     def update_bf_camera(self):
         """Update Bigface camera feed display."""
         bf_feed = self.camera_manager.get_feed('bf')
         
         while self.app.camera_running:
-            with self.app.annotated_frame_lock_bigface:
-                np_frame = np.frombuffer(
-                    self.app.shared_annotated_bigface.get_obj(), 
-                    dtype=np.uint8
-                ).reshape(self.app.frame_shape)
-                frame = np_frame.copy()
+            try:
+                # Check if feed still exists
+                if bf_feed is None or bf_feed.canvas is None:
+                    break
+                
+                with self.app.annotated_frame_lock_bigface:
+                    np_frame = np.frombuffer(
+                        self.app.shared_annotated_bigface.get_obj(), 
+                        dtype=np.uint8
+                    ).reshape(self.app.frame_shape)
+                    frame = np_frame.copy()
 
-            # Update the camera feed
-            bf_feed.update_frame(frame)
-            time.sleep(AppConfig.FRAME_UPDATE_RATE)
+                # Update the camera feed
+                bf_feed.update_frame(frame)
+                time.sleep(AppConfig.FRAME_UPDATE_RATE)
+            except Exception as e:
+                # Handle exceptions and exit gracefully
+                print(f"BF camera thread error: {e}")
+                break
     
     def start_camera_threads(self):
         """Start camera feed update threads."""

@@ -89,6 +89,15 @@ class WelVisionApp(tk.Tk):
     
     def show_login_page(self):
         """Display the login page."""
+        # Stop camera threads and inspection if running
+        if hasattr(self, 'camera_running') and self.camera_running:
+            self.camera_running = False
+            time.sleep(0.2)  # Give threads time to stop
+        
+        if hasattr(self, 'inspection_running') and self.inspection_running:
+            self.stop_inspection()
+        
+        # Show login page
         self.login_page = LoginPage(self, self.on_login_success)
         self.login_page.show()
     
