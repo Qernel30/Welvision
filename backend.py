@@ -168,8 +168,8 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
     roller_dict = {}
     previous_head_status = False
      
-    model_bf_path = r"C:\Users\NBC\Desktop\WELVISION-Project\Feb models\model_22_feb.pt"
-    model_head_path = r"C:\Users\NBC\Downloads\18 Sep 25 Head Train.pt"
+    model_bf_path = r".\models\BF_sr.pt"
+    model_head_path = r".\models\BF_head.pt"
 
     try: 
         model_bf = YOLO(model_bf_path)
@@ -186,10 +186,9 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
         return
         
     class_names = model_bf.names
-    print(class_names)
     roller_class_index = 5
 
-    warmup_frame = r"C:\Users\NBC\Desktop\WELVISION REBUILD\Warmup BF.jpg"
+    warmup_frame = r"Warmup BF.jpg"
     try:
         for i in range(30):  # Process 30 warmup frames
             results = model_bf.predict(warmup_frame, device=0, conf=1, verbose=False)
@@ -449,12 +448,11 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
                 return idx
         return 0
 
-    od_model_path = r"C:\Users\NBC\Desktop\WELVISION-Project\FEBRUARY-13-ENDGAME\mainsrc\NewModels\march_20.pt"
+    od_model_path = r".\models\OD_sr.pt"
     od_conf = shared_data.get('od_conf_threshold', 0.25)
-    print(f"OD Confidence Threshold: {od_conf}")
     od_model = YOLO(od_model_path).to("cuda")
 
-    warmup_frame = r"C:\Users\NBC\Desktop\WELVISION REBUILD\Warmup OD.jpg"
+    warmup_frame = r"Warmup OD.jpg"
     try:
         for i in range(30):  # Process 30 warmup frames
             od_model.predict(warmup_frame, device=0, conf=0.2, verbose=False)
