@@ -66,7 +66,7 @@ class ResultsPanel:
         
         return frame
     
-    def _create_result_row(self, parent, label_text, var_key, row):
+    def _create_result_row(self, parent, label_text, var_key, row, defect_type=False):
         """Create a single result row."""
         row_frame = tk.Frame(parent, bg=Colors.PRIMARY_BG)
         row_frame.pack(fill=tk.X, pady=3)
@@ -75,7 +75,7 @@ class ResultsPanel:
         label = tk.Label(
             row_frame,
             text=label_text,
-            font=Fonts.TEXT_BOLD,  # Larger bold text
+            font=Fonts.TEXT_BOLD if not defect_type else Fonts.TEXT,  # Slightly smaller for defects
             fg=Colors.WHITE,
             bg=Colors.PRIMARY_BG,
             anchor="w"
@@ -87,7 +87,7 @@ class ResultsPanel:
         value_label = tk.Label(
             row_frame,
             textvariable=self.result_vars[var_key],
-            font=Fonts.TEXT_BOLD,  # Larger bold text
+            font=Fonts.TEXT_BOLD if not defect_type else Fonts.TEXT,  # Slightly smaller for defects
             fg="#00ff00" if "percentage" not in var_key else "#ffff00",  # Green for numbers, Yellow for percentage
             bg=Colors.PRIMARY_BG,
             anchor="e"
@@ -196,3 +196,43 @@ class ResultsPanel:
         for key, value in kwargs.items():
             if key in self.result_vars:
                 self.result_vars[key].set(value)
+    
+    def update_from_shared_data(self, shared_data):
+        """
+        Update all results from shared_data dictionary.
+        
+        Args:
+            shared_data: Dictionary containing inspection statistics
+        """
+        # Update BF results
+        bf_inspected = shared_data.get("bf_inspected", 0)
+        bf_ok = shared_data.get("bf_ok_rollers", 0)
+        bf_not_ok = shared_data.get("bf_not_ok_rollers", 0)
+        bf_percentage = (bf_not_ok / bf_inspected * 100) if bf_inspected > 0 else 0.0
+        
+        self.result_vars["bf_inspected"].set(str(bf_inspected))
+        self.result_vars["bf_ok"].set(str(bf_ok))
+        self.result_vars["bf_not_ok"].set(str(bf_not_ok))
+        self.result_vars["bf_percentage"].set(f"{bf_percentage:.1f}%")
+        
+        # Update OD results
+        od_inspected = shared_data.get("od_inspected", 0)
+        od_ok = shared_data.get("od_ok_rollers", 0)
+        od_not_ok = shared_data.get("od_not_ok_rollers", 0)
+        od_percentage = (od_not_ok / od_inspected * 100) if od_inspected > 0 else 0.0
+        
+        self.result_vars["od_inspected"].set(str(od_inspected))
+        self.result_vars["od_ok"].set(str(od_ok))
+        self.result_vars["od_not_ok"].set(str(od_not_ok))
+        self.result_vars["od_percentage"].set(f"{od_percentage:.1f}%")
+        
+        # Update Overall results
+        overall_inspected = bf_inspected
+        overall_ok = od_ok
+        overall_not_ok = bf_not_ok + od_not_ok
+        overall_percentage = (overall_not_ok / overall_inspected * 100) if overall_inspected > 0 else 0.0
+        
+        self.result_vars["overall_inspected"].set(str(overall_inspected))
+        self.result_vars["overall_ok"].set(str(overall_ok))
+        self.result_vars["overall_not_ok"].set(str(overall_not_ok))
+        self.result_vars["overall_percentage"].set(f"{overall_percentage:.1f}%")

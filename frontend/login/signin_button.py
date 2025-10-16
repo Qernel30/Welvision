@@ -86,9 +86,7 @@ class SignInButton:
         self._is_animating = True
         
         # Change to pressed state (darker)
-        self.button.config(bg="#FFFFFF", relief=tk.SUNKEN)
-
-        self.button.config(text="Signing In...", fg="#000000")
+        self.button.config(bg="#FFFFFF", relief=tk.SUNKEN, text="Signing In...", fg="#000000")
         
         # Schedule return to normal state
         self.button.after(150, lambda: self._reset_button_state(callback))
@@ -100,12 +98,27 @@ class SignInButton:
         Args:
             callback: Optional callback to execute after reset
         """
-        self.button.config(bg=Colors.PRIMARY_BLUE, relief=tk.FLAT)
+        self.button.config(
+            bg=Colors.PRIMARY_BLUE, 
+            relief=tk.FLAT,
+            text="Sign In",  # Restore original text
+            fg=Colors.WHITE  # Restore white text
+        )
         self._is_animating = False
         
         # Execute callback if provided
         if callback:
             callback()
+    
+    def reset_to_normal(self):
+        """Force reset button to normal state (for failed authentication)."""
+        self.button.config(
+            bg=Colors.PRIMARY_BLUE,
+            relief=tk.FLAT,
+            text="Sign In",
+            fg=Colors.WHITE
+        )
+        self._is_animating = False
     
     def trigger_press_animation(self, callback=None):
         """

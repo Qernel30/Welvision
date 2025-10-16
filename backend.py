@@ -59,17 +59,13 @@ def plc_communication(plc_ip, rack, slot, db_number, shared_data, command_queue)
                 try:
                     command, _ = command_queue.get_nowait()
                     if command == 'accept_bigface':
-                        print("PLC Communication: Accepted Bigface roller.")
                         trigger_plc_action(plc_client, db_number, byte_index=1, bool_index=0, action="accept")
                     elif command == 'reject_bigface':
-                        print("PLC Communication: Rejected Bigface roller.")
                         trigger_plc_action(plc_client, db_number, byte_index=1, bool_index=1, action="reject")
                     elif command == 'accept_od':
                         trigger_plc_action(plc_client, db_number, byte_index=1, bool_index=2, action="accept")
-                        print("PLC Communication: Accepted OD roller.")
                     elif command == 'reject_od':
                         trigger_plc_action(plc_client, db_number, byte_index=1, bool_index=3, action="reject")
-                        print("PLC Communication: Rejected OD roller.")
                     else:
                         print(f"PLC Communication: Unknown command: {command}")
                 except Exception as e:
@@ -94,15 +90,10 @@ def trigger_plc_action(plc_client, db_number, byte_index, bool_index, action):
 
         data = plc_client.read_area(Areas.DB, db_number, 0, 2)
         set_bool(data, byte_index=byte_index, bool_index=bool_index, value=True)
-        print("*" * 100)
-        print(f"🔵 PLC Action: Setting {action.upper()} slot at byte {byte_index}, bit {bool_index} to True.")
-        print("*" * 100)
         plc_client.write_area(Areas.DB, db_number, 0, data)
 
         set_bool(data, byte_index=byte_index, bool_index=bool_index, value=False)
         plc_client.write_area(Areas.DB, db_number, 0, data)
-
-        print(f"✅ PLC Action: {action.upper()} slot reset.")
 
     except Exception as e:
         print(f"⚠ PLC Action: Error triggering {action.upper()} slot: {e}")
@@ -147,12 +138,10 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
     try: 
         model_bf = YOLO(model_bf_path)
         model_head = YOLO(model_head_path)
-        print("Model initially loaded in CPU")
-
         if torch.cuda.is_available():
             model_bf.to("cuda")
             model_head.to("cuda")
-            print("Model now loaded in GPU")
+            print("BF Model loaded in GPU")
 
     except:
         print("Model is not loaded exiting process")
@@ -204,6 +193,17 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
     latest_max = 240
     frame_number_head = 0
     
+    shared_data["bf_inspected"] = 0
+    shared_data["bf_ok_rollers"] = 0
+    shared_data["bf_not_ok_rollers"] = 0
+    shared_data["bf_rust"] = 0
+    shared_data["bf_dent"] = 0
+    shared_data["bf_damage"] = 0
+    shared_data["bf_high_head"] = 0
+    shared_data["bf_down_head"] = 0
+    shared_data["bf_others"] = 0
+
+    
     while True:
         
         current_bf_state = shared_data["bigface_presence"]
@@ -213,6 +213,7 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
 
             bf_triggered = True
             roller_dict[roller_id_counter] = {'defect': False , 'defect_names': ["No defect"]}
+            shared_data["bf_inspected"] += 1
             print(f"\n🎯 BF New roller detected! Assigned Roller ID: {roller_id_counter}")
 
         current_head_state = shared_data["head_classification"]
@@ -223,7 +224,7 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
                 np_frame = np.frombuffer(shared_frame_bigface.get_obj(), dtype=np.uint8).reshape(frame_shape)
                 frame = np_frame.copy()
 
-            results = model_head.predict(frame, device=0, conf=0.7, verbose=True, half=True, agnostic_nms=True)
+            results = model_head.predict(frame, device=0, conf=0.7, verbose=False, half=True, agnostic_nms=True)
 
             boxes = results[0].boxes.xyxy.cpu().numpy()  # shape: [N, 4]
             classes = results[0].boxes.cls.cpu().numpy()  # class IDs
@@ -346,6 +347,34 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
                 defect_detected = roller_dict[first_key]["defect"]
                 defect_names = roller_dict[first_key]['defect_names']
 
+                if first_key in roller_dict:
+                    roller_data = roller_dict[first_key]
+                    defect_detected = roller_data['defect']
+                    defect_names = roller_data['defect_names']
+
+                    if defect_detected:
+                        shared_data["bf_not_ok_rollers"] += 1
+                    else:
+                        shared_data["bf_ok_rollers"] += 1
+
+                    unique_defects = set(defect_names)
+
+                    for defect_name in unique_defects:
+                        defect_lower = defect_name.lower()
+                        
+                        if defect_lower == "rust":
+                            shared_data["bf_rust"] += 1
+                        elif defect_lower == "dent":
+                            shared_data["bf_dent"] += 1
+                        elif defect_lower == "damage":
+                            shared_data["bf_damage"] += 1
+                        elif defect_lower == "high head":
+                            shared_data["bf_high_head"] += 1
+                        elif defect_lower == "down head":
+                            shared_data["bf_down_head"] += 1
+                        elif defect_lower != "no defect":
+                            shared_data["bf_others"] += 1
+
                 roller_queue_bigface.put(defect_detected)
                 roller_updation_dict[first_key] = int(defect_detected)
                 roller_dict.pop(first_key)
@@ -370,8 +399,6 @@ def handle_slot_control_bigface(roller_queue_bigface,shared_data,command_queue):
             if not roller_queue_bigface.empty():
                 defect_detected = roller_queue_bigface.get()
                 status = "Defective" if defect_detected else "Good"
-                print(f"Slot control received roller status for Bigface: {status}")
-                print("accept_bigface" if not defect_detected else "reject_bigface")
                 command_queue.put(("accept_bigface" if not defect_detected else "reject_bigface", None))
         elif not shared_data["bigface"]:
             a = False
@@ -425,6 +452,7 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
     od_model_path = r".\models\OD_sr.pt"
     od_conf = shared_data.get('od_conf_threshold', 0.25)
     od_model = YOLO(od_model_path).to("cuda")
+    print("OD Model loaded in GPU")
 
     warmup_frame = r"Warmup OD.jpg"
     try:
@@ -442,6 +470,16 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
     roller_id_counter = 0  
     BIGFACE_DETECTED = False
 
+    shared_data["od_inspected"] = 0
+    shared_data["od_ok_rollers"] = 0
+    shared_data["od_not_ok_rollers"] = 0
+    shared_data["od_rust"] = 0
+    shared_data["od_dent"] = 0
+    shared_data["od_damage"] = 0
+    shared_data["od_damage_on_end"] = 0
+    shared_data["od_spherical_mark"] = 0
+    shared_data["od_others"] = 0
+
     while True:
         current_od_state = shared_data["od_presence"]
 
@@ -451,15 +489,15 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
             roller_id_counter += 1
             
             roller_dict[roller_id_counter] = {'defect': False , 'defect_names': ["No defect"]}
-
-            print(f"\n🎯 OD New roller detected! Assigned Roller ID: {roller_id_counter} , in frame number : {frame_number + 1}")
+            shared_data["od_inspected"] += 1
+            print(f"\n🎯 OD New roller detected! Assigned Roller ID: {roller_id_counter}")
 
         if od_triggered:
                 
             with frame_lock_od:
                 np_frame = np.frombuffer(shared_frame_od.get_obj(), dtype=np.uint8).reshape(frame_shape)
 
-            results = od_model.predict(np_frame, device=0, conf=od_conf, verbose=False)
+            results = od_model.predict(np_frame, device=0, conf=od_conf, verbose=False, half=True, agnostic_nms=True)
             detections = [
                 ("roller" if int(box[-1]) == 5 else "defect", int(box[0]), int(box[1]), int(box[2]), int(box[3]), int(box[-1]) , float(box[-2]) )
                 for box in results[0].boxes.data
@@ -505,13 +543,37 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
 
                 defect_detected = list(roller_dict.values())[0]['defect']
 
-                # log_od_status(list(roller_dict.keys())[0],
-                #                 "Defective" if defect_detected else "No Defect",
-                #                 "Rejected" if defect_detected else "Accepted",
-                #             list(roller_dict.values())[0])
-
-
                 first_key = next(iter(roller_dict))
+
+                if first_key in roller_dict:
+                    roller_data = roller_dict[first_key]
+                    defect_detected = roller_data['defect']
+                    defect_names = roller_data['defect_names']
+
+                    if defect_detected:
+                        shared_data["od_not_ok_rollers"] += 1
+                    else:
+                        shared_data["od_ok_rollers"] += 1
+
+                    unique_defects = set(defect_names)
+
+                    for defect_name in unique_defects:
+                        defect_lower = defect_name.lower()
+                        
+                        if defect_lower == "rust":
+                            shared_data["od_rust"] += 1
+                        elif defect_lower == "dent":
+                            shared_data["od_dent"] += 1
+                        elif defect_lower == "damage":
+                            shared_data["od_damage"] += 1
+                        elif defect_lower == "damage on end" or defect_lower == "damage_on_end":
+                            shared_data["od_damage_on_end"] += 1
+                        elif defect_lower == "spherical mark" or defect_lower == "spherical_mark":
+                            shared_data["od_spherical_mark"] += 1
+                        elif defect_lower != "no defect":
+                            shared_data["od_others"] += 1
+
+
                 roller_dict.pop(first_key) 
                 if roller_updation_dict[first_key] == 0 :
                     roller_queue_od.put(defect_detected)
@@ -531,11 +593,9 @@ def handle_slot_control_od(roller_queue_od, shared_data, command_queue):
             if not roller_queue_od.empty():
                 defect_detected = roller_queue_od.get()
                 status = "❌ Defective" if defect_detected else "✅ Good"
-                print(f"Slot control received roller status for od: {status}")
                 command_queue.put(("reject_od" if defect_detected else "accept_od" , None))
 
             queue_size = roller_queue_od.qsize()
-            print(f"📌 Queue size: {queue_size}, Contents: {'Empty' if queue_size == 0 else 'Not Empty'}")
 
         elif not shared_data["od"]:
             processing = False

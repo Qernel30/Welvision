@@ -90,6 +90,9 @@ class WelVisionApp(tk.Tk):
         # Footer
         self.footer_frame = None
         
+        # Logout button reference
+        self.logout_button = None
+        
         # Show login page
         self.show_login_page()
     
@@ -124,7 +127,7 @@ class WelVisionApp(tk.Tk):
         company_label = tk.Label(
             self.footer_frame,
             text="Developed and Maintained by \n© Welvision Pvt Limited",
-            font=Fonts.HEADER,  # Using HEADER font (16pt bold) for larger size
+            font=Fonts.TEXT_BOLD,  # Using TEXT_BOLD font for larger size
             fg="#FFFFFF",
             bg=Colors.PRIMARY_BG
         )
@@ -156,8 +159,8 @@ class WelVisionApp(tk.Tk):
         main_frame = tk.Frame(self, bg=Colors.PRIMARY_BG)
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Create header
-        create_header(
+        # Create header and store logout button reference
+        header_frame, self.logout_button = create_header(
             main_frame, 
             AppConfig.WINDOW_TITLE,
             self.current_user, 
@@ -175,6 +178,9 @@ class WelVisionApp(tk.Tk):
         
         # Add global footer
         self._create_global_footer()
+        
+        # Set window close protocol handler
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
         
         # Show initial tab (Inference)
         self.show_tab("inference")
@@ -221,6 +227,31 @@ class WelVisionApp(tk.Tk):
         self.shared_data["system_mode"] = False  # False = MANUAL (default)
         self.shared_data["system_ready"] = False  # False = NOT READY (default)
         self.shared_data["disc_status"] = False  # False = NOT READY (default)
+        
+        # BF Defect Statistics
+        self.shared_data["bf_inspected"] = 0
+        self.shared_data["bf_ok_rollers"] = 0
+        self.shared_data["bf_not_ok_rollers"] = 0
+        self.shared_data["rust"] = 0
+        self.shared_data["dent"] = 0
+        self.shared_data["damage"] = 0
+        self.shared_data["high_head"] = 0
+        self.shared_data["down_head"] = 0
+        self.shared_data["others"] = 0
+        
+        # OD Defect Statistics
+        self.shared_data["od_inspected"] = 0
+        self.shared_data["od_ok_rollers"] = 0
+        self.shared_data["od_not_ok_rollers"] = 0
+        self.shared_data["od_rust"] = 0
+        self.shared_data["od_dent"] = 0
+        self.shared_data["od_damage"] = 0
+        self.shared_data["od_damage_on_end"] = 0
+        self.shared_data["od_spherical_mark"] = 0
+        self.shared_data["od_others"] = 0
+        
+        # Track inspection session start time
+        self.inspection_start_time = None
         
         self.command_queue = Queue()
         
@@ -327,6 +358,10 @@ class WelVisionApp(tk.Tk):
         self.inspection_running = True
         if self.inference_tab and self.inference_tab.control_panel:
             self.inference_tab.control_panel.enable_stop()
+        
+        # Record start time
+        from datetime import datetime
+        self.inspection_start_time = datetime.now().time()
         
         # Recreate processes before starting
         self.create_processes()

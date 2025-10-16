@@ -155,6 +155,10 @@ class InferenceTab:
                 # System is not ready - show "Not Available" in yellow for both
                 self.status_panel.update_machine_mode("Not Available", "#ffff00")  # Yellow
                 self.status_panel.update_disc_status("Not Available", "#ffff00")  # Yellow
+            
+            # Update results panel from shared_data
+            if self.results_panel:
+                self.results_panel.update_from_shared_data(self.app.shared_data)
         
         # Continue monitoring every 500ms
         self.parent.after(500, self._monitor_status_updates)

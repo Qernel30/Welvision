@@ -34,7 +34,7 @@ def create_header(parent, title, user_email, user_role, logout_callback):
         logout_callback: Function to call on logout
         
     Returns:
-        Header frame
+        Tuple of (header_frame, logout_button)
     """
     header_frame = tk.Frame(parent, bg=Colors.PRIMARY_BG, height=50)
     header_frame.pack(fill=tk.X)
@@ -79,7 +79,7 @@ def create_header(parent, title, user_email, user_role, logout_callback):
     )
     logout_button.pack(side=tk.LEFT)
     
-    return header_frame
+    return header_frame, logout_button
 
 
 def configure_notebook_style():

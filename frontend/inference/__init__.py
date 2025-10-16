@@ -10,6 +10,7 @@ from .control_panel import ControlPanel
 from .results_panel import ResultsPanel
 from .roller_info_panel import RollerInfoPanel
 from .threshold_panel import ThresholdPanel
+from .state_manager import InspectionStateManager
 
 __all__ = [
     'InferenceTab',
@@ -19,5 +20,6 @@ __all__ = [
     'ControlPanel',
     'ResultsPanel',
     'RollerInfoPanel',
-    'ThresholdPanel'
+    'ThresholdPanel',
+    'InspectionStateManager'
 ]

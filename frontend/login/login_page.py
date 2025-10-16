@@ -96,6 +96,9 @@ class LoginPage:
             # Call the success callback
             self.on_login_success(email, role)
         else:
+            # Reset button state immediately for failed authentication
+            if self.signin_button:
+                self.signin_button.reset_to_normal()
             # Show error message
             AuthHandler.show_error()
     
