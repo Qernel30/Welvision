@@ -1,0 +1,10 @@
+opencv-python
+Pillow
+numpy
+ultralytics
+python-snap7
+pygrabber
+pywin32
+torch==2.8.0+cu129
+torchvision==0.23.0+cu129
+--extra-index-url https://download.pytorch.org/whl/cu129

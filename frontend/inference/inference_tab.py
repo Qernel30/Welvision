@@ -47,6 +47,9 @@ class InferenceTab:
         self.status_panel = StatusPanel(main_container, self.app)
         self.status_panel.create()
         
+        # Start monitoring status updates
+        self._monitor_status_updates()
+        
         # Middle section: Camera feeds only (full width)
         middle_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
         middle_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -125,3 +128,33 @@ class InferenceTab:
         self.app.bf_thread = threading.Thread(target=self.update_bf_camera)
         self.app.bf_thread.daemon = True
         self.app.bf_thread.start()
+    
+    def _monitor_status_updates(self):
+        """Monitor shared_data for status updates and update status panel."""
+        if hasattr(self.app, 'shared_data') and self.app.shared_data and self.status_panel:
+            # Get system_ready flag (master control)
+            system_ready = self.app.shared_data.get('system_ready', False)
+            
+            if system_ready:
+                # System is ready - show actual status
+                
+                # Update Machine Mode based on system_mode flag
+                system_mode = self.app.shared_data.get('system_mode', False)
+                if system_mode:
+                    self.status_panel.update_machine_mode("AUTO", "#00ff00")  # Green
+                else:
+                    self.status_panel.update_machine_mode("MANUAL", "#ff0000")  # Red
+                
+                # Update Disc Status based on disc_status flag
+                disc_status = self.app.shared_data.get('disc_status', False)
+                if disc_status:
+                    self.status_panel.update_disc_status("READY", "#00ff00")  # Green
+                else:
+                    self.status_panel.update_disc_status("NOT READY", "#ff0000")  # Red
+            else:
+                # System is not ready - show "Not Available" in yellow for both
+                self.status_panel.update_machine_mode("Not Available", "#ffff00")  # Yellow
+                self.status_panel.update_disc_status("Not Available", "#ffff00")  # Yellow
+        
+        # Continue monitoring every 500ms
+        self.parent.after(500, self._monitor_status_updates)

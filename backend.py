@@ -17,18 +17,22 @@ def plc_communication(plc_ip, rack, slot, db_number, shared_data, command_queue)
     try:
         plc_client.connect(plc_ip, rack, slot)
         print("✅ PLC Communication: Connected to PLC.")
-        # Turn on Lights & Application Ready signal
-        data = plc_client.read_area(Areas.DB, db_number, 0, 2)
-        set_bool(data, byte_index=1, bool_index=6, value=True)
-        set_bool(data, byte_index=1, bool_index=7, value=True)
-        plc_client.write_area(Areas.DB, db_number, 0, data)
-        print("✅ PLC Communication: Lights ON & Application Ready signal sent.")
+        while True:
+            if shared_data.get('bf_ready', False) and shared_data.get('od_ready', False):
+                data = plc_client.read_area(Areas.DB, db_number, 0, 2)
+                set_bool(data, byte_index=1, bool_index=6, value=True)
+                set_bool(data, byte_index=1, bool_index=7, value=True)
+                plc_client.write_area(Areas.DB, db_number, 0, data)
+                shared_data['overall_system_ready'] = True
+                plc_client.disconnect()
+                break
         
     except Exception as e:
         print(f"PLC Communication: Connection error: {e} ⚠")
         return
 
     try:
+        plc_client.connect(plc_ip, rack, slot)
         while True:
             try:
                 data = plc_client.read_area(Areas.DB, db_number, 0, 3)
@@ -37,13 +41,16 @@ def plc_communication(plc_ip, rack, slot, db_number, shared_data, command_queue)
                 # shared_data['od_presence'] = get_bool(data, byte_index=1, bool_index=4)
                 # shared_data['bigface'] = get_bool(data, byte_index=0, bool_index=1)
                 # shared_data['od'] = get_bool(data, byte_index=0, bool_index=2)
-                # shared_data['head_classification_sensor'] = get_bool(data, byte_index=2, bool_index=2)
+                # shared_data['head_classification'] = get_bool(data, byte_index=2, bool_index=2)
 
                 shared_data['bigface_presence'] = get_bool(data, 0, 1)
                 shared_data['bigface'] = get_bool(data, 0, 2)
                 shared_data['od'] = get_bool(data, 0, 0)
                 shared_data['od_presence'] = get_bool(data, 1, 4)
-                shared_data['head_classification_sensor'] = get_bool(data, 2, 2)
+                shared_data['head_classification'] = get_bool(data, 2, 2)
+                shared_data['system_mode'] = get_bool(data, 2, 0)
+                shared_data['disc_status'] = get_bool(data, 2, 1)
+                shared_data['system_ready'] = get_bool(data, 1, 6)
 
             except Exception as e:
                 print(f"PLC Communication: Error reading sensors: {e} ⚠")
@@ -159,6 +166,7 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
         for i in range(30):  # Process 30 warmup frames
             results = model_bf.predict(warmup_frame, device=0, conf=1, verbose=False)
         print("Warmup image YOLO processing for bigface complete.")
+        shared_data["bf_ready"] = True
     except Exception as e:
         print(f"Error during YOLO inference on warmup image: {e}")
 
@@ -207,7 +215,7 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
             roller_dict[roller_id_counter] = {'defect': False , 'defect_names': ["No defect"]}
             print(f"\n🎯 BF New roller detected! Assigned Roller ID: {roller_id_counter}")
 
-        current_head_state = shared_data["head_classification_sensor"]
+        current_head_state = shared_data["head_classification"]
 
         if current_head_state and not previous_head_status:
 
@@ -423,6 +431,7 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
         for i in range(30):  # Process 30 warmup frames
             od_model.predict(warmup_frame, device=0, conf=0.2, verbose=False)
         print("Warmup image YOLO processing for od complete.")
+        shared_data["od_ready"] = True
     except Exception as e:
         print(f"Error during YOLO inference on warmup image: {e}")
 

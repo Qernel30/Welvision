@@ -4,6 +4,7 @@ Contains start/stop/reset buttons and allow images checkbox
 """
 
 import tkinter as tk
+from tkinter import messagebox
 from ..utils.styles import Colors, Fonts
 
 
@@ -40,7 +41,7 @@ class ControlPanel:
             fg=Colors.WHITE,
             width=15,
             height=2,
-            command=self.app.start_inspection
+            command=self._on_start_inspection
         )
         self.start_button.pack(side=tk.LEFT, padx=10, pady=5)
         
@@ -104,6 +105,30 @@ class ControlPanel:
         """Toggle allow all images setting."""
         status = "enabled" if self.allow_images_var.get() else "disabled"
         print(f"Allow all images: {status}")
+    
+    def _on_start_inspection(self):
+        """Handle start button click and monitor system readiness."""
+        # Start the inspection process
+        self.app.start_inspection()
+        
+        # Start monitoring for system readiness
+        self._check_system_ready()
+    
+    def _check_system_ready(self):
+        """Check if both BF and OD models are ready and show popup."""
+        if hasattr(self.app, 'shared_data') and self.app.shared_data:
+            # Check if overall system is ready
+            if self.app.shared_data.get('overall_system_ready', False):
+                # Show success popup
+                messagebox.showinfo(
+                    "System Ready",
+                    "✅ System is Ready!\n\nBoth BF and OD models have been loaded and warmed up successfully.\nLights are ON and the system is ready for inspection."
+                )
+                return
+            
+            # If not ready yet, check again after 500ms
+            if self.app.inspection_running:
+                self.parent.after(500, self._check_system_ready)
     
     def enable_start(self):
         """Enable the start button and disable stop button."""

@@ -123,9 +123,9 @@ class WelVisionApp(tk.Tk):
         # Create company label with larger font
         company_label = tk.Label(
             self.footer_frame,
-            text="© Welvision Pvt Limited",
+            text="Developed and Maintained by \n© Welvision Pvt Limited",
             font=Fonts.HEADER,  # Using HEADER font (16pt bold) for larger size
-            fg="#888888",
+            fg="#FFFFFF",
             bg=Colors.PRIMARY_BG
         )
         company_label.pack(side=tk.RIGHT, padx=20)
@@ -212,8 +212,15 @@ class WelVisionApp(tk.Tk):
         self.shared_data['od'] = False
         self.shared_data['bigface_presence'] = False
         self.shared_data['od_presence'] = False
+        self.shared_data['head_classification'] = False
         self.shared_data['od_conf_threshold'] = self.od_conf_threshold
         self.shared_data['bf_conf_threshold'] = self.bf_conf_threshold
+        self.shared_data["bf_ready"] = False
+        self.shared_data["od_ready"] = False
+        self.shared_data["overall_system_ready"] = False
+        self.shared_data["system_mode"] = False  # False = MANUAL (default)
+        self.shared_data["system_ready"] = False  # False = NOT READY (default)
+        self.shared_data["disc_status"] = False  # False = NOT READY (default)
         
         self.command_queue = Queue()
         

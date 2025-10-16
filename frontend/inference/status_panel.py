@@ -101,28 +101,28 @@ class StatusPanel:
         """Create machine mode section."""
         frame = self._create_section_frame(parent, "Machine Mode", column)
         
-        self.status_vars['machine_mode'] = tk.StringVar(value="AUTO")
-        label = tk.Label(
+        self.status_vars['machine_mode'] = tk.StringVar(value="Not Available")
+        self.machine_mode_label = tk.Label(
             frame,
             textvariable=self.status_vars['machine_mode'],
             font=Fonts.TEXT_BOLD,
-            fg="#00ff00",  # Bright green
+            fg="#ffff00",  # Yellow (default Not Available)
             bg=Colors.PRIMARY_BG,
             height=1
         )
-        label.pack(padx=8, pady=8, fill=tk.BOTH, expand=True)
+        self.machine_mode_label.pack(padx=8, pady=8, fill=tk.BOTH, expand=True)
     
     def _create_disc_status_section(self, parent, column):
         """Create disc status section."""
         frame = self._create_section_frame(parent, "Disc Status", column)
         
-        self.status_vars['disc_status'] = tk.StringVar(value="READY")
+        self.status_vars['disc_status'] = tk.StringVar(value="Not Available")
         
         self.disc_label = tk.Label(
             frame,
             textvariable=self.status_vars['disc_status'],
             font=Fonts.TEXT_BOLD,
-            fg="#00ff00",
+            fg="#ffff00",  # Yellow (default Not Available)
             bg=Colors.PRIMARY_BG,
             height=1
         )
@@ -235,6 +235,12 @@ class StatusPanel:
         self.status_vars['disc_status'].set(status)
         if color:
             self.disc_label.config(fg=color)
+    
+    def update_machine_mode(self, mode, color=None):
+        """Update machine mode display."""
+        self.status_vars['machine_mode'].set(mode)
+        if color:
+            self.machine_mode_label.config(fg=color)
     
     def update_confidence_thresholds(self):
         """Update confidence threshold displays."""
