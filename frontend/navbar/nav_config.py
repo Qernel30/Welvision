@@ -1,0 +1,54 @@
+"""
+Navigation Bar Configuration
+Defines the navigation structure and button configurations
+"""
+
+
+class NavConfig:
+    """Navigation bar configuration constants."""
+    
+    # Navigation button definitions
+    # Format: (button_id, display_text, tab_name)
+    NAV_BUTTONS = [
+        ("inference", "INFERENCE", "Inference"),
+        ("data", "DATA", "Data"),
+        ("diagnosis", "DIAGNOSIS", "Diagnosis"),
+        ("settings", "SETTINGS", "Settings"),
+        ("model_management", "MODEL MANAGEMENT", "Model Management"),
+        ("user_management", "USER MANAGEMENT", "User Management"),
+        ("system_check", "SYSTEM CHECK", "System Check"),
+        ("info", "INFO", "Info"),
+        ("config", "CONFIG", "Config"),
+    ]
+    
+    # Navbar styling
+    NAVBAR_HEIGHT = 50
+    BUTTON_GAP = 5  # Gap between buttons in pixels
+    NAVBAR_PADDING_X = 10
+    NAVBAR_PADDING_Y = 5
+    
+    @classmethod
+    def get_button_configs(cls):
+        """Get all button configurations as a list of tuples."""
+        return cls.NAV_BUTTONS
+    
+    @classmethod
+    def get_button_ids(cls):
+        """Get list of all button IDs."""
+        return [btn[0] for btn in cls.NAV_BUTTONS]
+    
+    @classmethod
+    def get_button_text(cls, button_id):
+        """Get button text for a given button ID."""
+        for btn_id, text, _ in cls.NAV_BUTTONS:
+            if btn_id == button_id:
+                return text
+        return None
+    
+    @classmethod
+    def get_tab_name(cls, button_id):
+        """Get tab name for a given button ID."""
+        for btn_id, _, tab_name in cls.NAV_BUTTONS:
+            if btn_id == button_id:
+                return tab_name
+        return None

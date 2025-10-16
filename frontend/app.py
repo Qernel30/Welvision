@@ -3,7 +3,6 @@ Main Application Class for WelVision System
 """
 
 import tkinter as tk
-import tkinter.ttk as ttk
 import numpy as np
 import time
 from multiprocessing import Process, Array, Queue, Lock, Value, Manager
@@ -14,8 +13,9 @@ from snap7.type import Areas
 
 from .utils.styles import Colors, Fonts
 from .utils.config import AppConfig
-from .utils.helpers import center_window, create_header, configure_notebook_style
+from .utils.helpers import center_window, create_header
 from .login import LoginPage
+from .navbar import NavBarManager
 from .inference import InferenceTab
 from .statistics import StatisticsTab
 from .settings import SettingsTab
@@ -27,8 +27,6 @@ from backend import (
     capture_frames_od,
     process_frames_od,
     handle_slot_control_od,
-    initialize_bigface_csv,
-    initialize_od_csv
 )
 
 
@@ -74,9 +72,14 @@ class WelVisionApp(tk.Tk):
         
         # Page references
         self.login_page = None
+        self.navbar_manager = None
         self.inference_tab = None
         self.statistics_tab = None
         self.settings_tab = None
+        
+        # Content frame reference
+        self.content_frame = None
+        self.current_tab_frame = None
         
         # Backend system variables (will be initialized later)
         self.plc_process = None
@@ -136,31 +139,16 @@ class WelVisionApp(tk.Tk):
             self.show_login_page
         )
         
-        # Configure tab style
-        configure_notebook_style()
+        # Create navigation bar
+        self.navbar_manager = NavBarManager(main_frame, self.on_nav_change)
+        self.navbar_manager.create()
         
-        # Create tabs
-        tab_control = ttk.Notebook(main_frame)
+        # Create content frame for tabs
+        self.content_frame = tk.Frame(main_frame, bg=Colors.PRIMARY_BG)
+        self.content_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
-        inference_tab_frame = tk.Frame(tab_control, bg=Colors.PRIMARY_BG)
-        statistics_tab_frame = tk.Frame(tab_control, bg=Colors.PRIMARY_BG)
-        settings_tab_frame = tk.Frame(tab_control, bg=Colors.PRIMARY_BG)
-        
-        tab_control.add(inference_tab_frame, text="Inference")
-        tab_control.add(statistics_tab_frame, text="Statistics")
-        tab_control.add(settings_tab_frame, text="Settings")
-        
-        tab_control.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        # Setup tabs
-        self.inference_tab = InferenceTab(inference_tab_frame, self)
-        self.inference_tab.setup()
-        
-        self.statistics_tab = StatisticsTab(statistics_tab_frame, self)
-        self.statistics_tab.setup()
-        
-        self.settings_tab = SettingsTab(settings_tab_frame, self)
-        self.settings_tab.setup()
+        # Show initial tab (Inference)
+        self.show_tab("inference")
         
         # Start camera feeds
         self.start_camera_feeds()
@@ -172,9 +160,6 @@ class WelVisionApp(tk.Tk):
         """Initialize the backend inspection system."""
         print("Initializing backend system...")
         
-        # Initialize CSV logs
-        initialize_bigface_csv()
-        initialize_od_csv()
         
         # Load YOLO models
         print("Loading YOLO models...")
@@ -362,10 +347,112 @@ class WelVisionApp(tk.Tk):
         self.processes = []
         print("✅ Inspection stopped.")
     
+    def on_nav_change(self, button_id):
+        """
+        Handle navigation button click.
+        
+        Args:
+            button_id: ID of the clicked navigation button
+        """
+        print(f"Navigation changed to: {button_id}")
+        self.show_tab(button_id)
+    
+    def show_tab(self, tab_id):
+        """
+        Show the specified tab.
+        
+        Args:
+            tab_id: ID of the tab to show
+        """
+        # Clear current tab content
+        if self.current_tab_frame:
+            self.current_tab_frame.destroy()
+        
+        # Create new tab frame
+        self.current_tab_frame = tk.Frame(self.content_frame, bg=Colors.PRIMARY_BG)
+        self.current_tab_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Setup the appropriate tab
+        if tab_id == "inference":
+            self.inference_tab = InferenceTab(self.current_tab_frame, self)
+            self.inference_tab.setup()
+            # Restart camera feeds if they were running
+            if self.camera_running:
+                self.start_camera_feeds()
+        
+        elif tab_id == "data":
+            self._show_placeholder_tab("Data Tab", "Data management and viewing functionality")
+        
+        elif tab_id == "diagnosis":
+            self._show_placeholder_tab("Diagnosis Tab", "System diagnosis and troubleshooting")
+        
+        elif tab_id == "settings":
+            self.settings_tab = SettingsTab(self.current_tab_frame, self)
+            self.settings_tab.setup()
+        
+        elif tab_id == "model_management":
+            self._show_placeholder_tab("Model Management Tab", "YOLO model training and management")
+        
+        elif tab_id == "user_management":
+            self._show_placeholder_tab("User Management Tab", "User accounts and permissions")
+        
+        elif tab_id == "system_check":
+            self._show_placeholder_tab("System Check Tab", "Hardware and connection diagnostics")
+        
+        elif tab_id == "info":
+            self.statistics_tab = StatisticsTab(self.current_tab_frame, self)
+            self.statistics_tab.setup()
+        
+        elif tab_id == "config":
+            self._show_placeholder_tab("Config Tab", "System configuration and parameters")
+        
+        # Update navbar active state
+        if self.navbar_manager:
+            self.navbar_manager.set_active_button(tab_id)
+    
+    def _show_placeholder_tab(self, title, description):
+        """
+        Show a placeholder tab for unimplemented features.
+        
+        Args:
+            title: Tab title
+            description: Tab description
+        """
+        container = tk.Frame(self.current_tab_frame, bg=Colors.PRIMARY_BG)
+        container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        title_label = tk.Label(
+            container,
+            text=title,
+            font=Fonts.LARGE,
+            fg=Colors.WHITE,
+            bg=Colors.PRIMARY_BG
+        )
+        title_label.pack(pady=(50, 20))
+        
+        desc_label = tk.Label(
+            container,
+            text=description,
+            font=Fonts.TEXT,
+            fg=Colors.WHITE,
+            bg=Colors.PRIMARY_BG
+        )
+        desc_label.pack(pady=10)
+        
+        info_label = tk.Label(
+            container,
+            text="This feature is under development",
+            font=Fonts.SMALL,
+            fg="#888888",
+            bg=Colors.PRIMARY_BG
+        )
+        info_label.pack(pady=10)
+    
     def start_camera_feeds(self):
         """Start camera feed update threads."""
         self.camera_running = True
-        self.inference_tab.start_camera_threads()
+        if self.inference_tab:
+            self.inference_tab.start_camera_threads()
     
     def update_statistics(self):
         """Update statistics display (mock data for now)."""

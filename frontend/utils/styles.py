@@ -12,6 +12,8 @@ class Colors:
     SUCCESS = "#28a745"
     DANGER = "#dc3545"
     PRIMARY_BLUE = "#007bff"
+    BUTTON_BG = "#1e4d8b"
+    BUTTON_HOVER = "#2563a8"
 
 
 class Fonts:
