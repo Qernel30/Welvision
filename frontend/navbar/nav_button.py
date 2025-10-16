@@ -27,10 +27,10 @@ class NavButton:
         self.button = None
         self.is_active = False
         
-        # Button styling
-        self.inactive_bg = Colors.BUTTON_BG
-        self.active_bg = Colors.SUCCESS  # Green color for active state
-        self.hover_bg = Colors.BUTTON_HOVER
+        # Button styling (matching expected UI style)
+        self.inactive_bg = "#2563a8"  # Blue for inactive
+        self.active_bg = "#28a745"     # Green for active state
+        self.hover_bg = "#3a7bc8"      # Lighter blue on hover
         self.text_color = Colors.WHITE
         
     def create(self):
@@ -38,15 +38,16 @@ class NavButton:
         self.button = tk.Button(
             self.parent,
             text=self.text,
-            font=Fonts.TEXT_BOLD,
+            font=Fonts.SMALL_BOLD,
             bg=self.inactive_bg,
             fg=self.text_color,
             activebackground=self.hover_bg,
             activeforeground=self.text_color,
-            relief=tk.FLAT,
+            relief=tk.RAISED,
+            bd=2,
             cursor="hand2",
-            padx=20,
-            pady=10,
+            padx=15,
+            pady=8,
             command=self._on_click
         )
         

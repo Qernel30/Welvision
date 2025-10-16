@@ -49,24 +49,35 @@ def create_header(parent, title, user_email, user_role, logout_callback):
     )
     logo_label.pack(side=tk.LEFT, padx=20, pady=5)
     
-    # User info
+    # User info and logout on the right
+    right_frame = tk.Frame(header_frame, bg=Colors.PRIMARY_BG)
+    right_frame.pack(side=tk.RIGHT, padx=10, pady=5)
+    
+    # User info label
     user_label = tk.Label(
-        header_frame, 
+        right_frame, 
         text=f"{user_role}: {user_email}",
-        font=Fonts.TEXT, 
+        font=Fonts.TEXT_BOLD, 
         fg=Colors.WHITE, 
         bg=Colors.PRIMARY_BG
     )
-    user_label.pack(side=tk.RIGHT, padx=20, pady=5)
+    user_label.pack(side=tk.LEFT, padx=(0, 10))
     
-    # Logout button
+    # Logout button with styling
     logout_button = tk.Button(
-        header_frame, 
+        right_frame, 
         text="Logout", 
-        font=Fonts.SMALL,
+        font=Fonts.SMALL_BOLD,
+        bg=Colors.DANGER,
+        fg=Colors.WHITE,
+        relief=tk.RAISED,
+        bd=2,
+        padx=15,
+        pady=5,
+        cursor="hand2",
         command=logout_callback
     )
-    logout_button.pack(side=tk.RIGHT, padx=10, pady=5)
+    logout_button.pack(side=tk.LEFT)
     
     return header_frame
 

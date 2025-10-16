@@ -32,7 +32,7 @@ class NavBarManager:
         # Create navbar container frame
         self.navbar_frame = tk.Frame(
             self.parent,
-            bg=Colors.SECONDARY_BG,
+            bg=Colors.PRIMARY_BG,
             height=NavConfig.NAVBAR_HEIGHT
         )
         self.navbar_frame.pack(
@@ -41,12 +41,12 @@ class NavBarManager:
             pady=NavConfig.NAVBAR_PADDING_Y
         )
         
-        # Create buttons container (centered, not full width)
+        # Create buttons container (left-aligned, not centered)
         buttons_container = tk.Frame(
             self.navbar_frame,
-            bg=Colors.SECONDARY_BG
+            bg=Colors.PRIMARY_BG
         )
-        buttons_container.pack(anchor=tk.CENTER)
+        buttons_container.pack(anchor=tk.W, padx=5)
         
         # Create all navigation buttons
         for button_id, button_text, _ in NavConfig.get_button_configs():

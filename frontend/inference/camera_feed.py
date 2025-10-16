@@ -38,25 +38,27 @@ class CameraFeed:
             row: Grid row position
             column: Grid column position
         """
-        # Create frame for this camera
+        # Create frame for this camera (no border around the labeled frame)
         camera_frame = tk.LabelFrame(
             self.parent,
             text=self.title,
             font=Fonts.TEXT_BOLD,
             fg=Colors.WHITE,
             bg=Colors.PRIMARY_BG,
-            bd=2
+            bd=0,
+            highlightthickness=0
         )
-        camera_frame.grid(row=row, column=column, padx=10, pady=5, sticky="nsew")
+        camera_frame.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
         
-        # Create canvas for displaying video
+        # Create canvas for displaying video without border
         self.canvas = tk.Canvas(
             camera_frame,
             bg=Colors.BLACK,
             width=AppConfig.CAMERA_WIDTH,
-            height=AppConfig.CAMERA_HEIGHT
+            height=AppConfig.CAMERA_HEIGHT,
+            highlightthickness=0
         )
-        self.canvas.pack(padx=10, pady=5)
+        self.canvas.pack(padx=5, pady=5)
         
         return camera_frame
     
@@ -108,26 +110,29 @@ class CameraFeedManager:
         self.feeds = {}
         self.camera_frame = None
         
-    def setup(self):
+    def setup(self, parent=None):
         """Setup all camera feeds."""
+        # Use provided parent or default to self.parent
+        target_parent = parent if parent else self.parent
+        
         # Create main camera frame
-        self.camera_frame = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
-        self.camera_frame.pack(fill=tk.BOTH, expand=False, padx=5, pady=10)
+        self.camera_frame = tk.Frame(target_parent, bg=Colors.PRIMARY_BG)
+        self.camera_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
         
         # Configure grid weights
         self.camera_frame.grid_columnconfigure(0, weight=1)
         self.camera_frame.grid_columnconfigure(1, weight=1)
         self.camera_frame.grid_rowconfigure(0, weight=1)
         
-        # Create OD camera feed
-        od_feed = CameraFeed(self.camera_frame, "Camera 1 - OD", "od")
-        od_feed.create(row=0, column=0)
-        self.feeds['od'] = od_feed
-        
-        # Create Bigface camera feed
-        bf_feed = CameraFeed(self.camera_frame, "Camera 2 - BIG FACE", "bf")
-        bf_feed.create(row=0, column=1)
+        # Create BF camera feed (left)
+        bf_feed = CameraFeed(self.camera_frame, "BF Feed", "bf")
+        bf_feed.create(row=0, column=0)
         self.feeds['bf'] = bf_feed
+        
+        # Create OD camera feed (right)
+        od_feed = CameraFeed(self.camera_frame, "OD Feed", "od")
+        od_feed.create(row=0, column=1)
+        self.feeds['od'] = od_feed
         
         return self.feeds
     

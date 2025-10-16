@@ -28,18 +28,19 @@ class LoginForm:
         Returns:
             container: The inner container frame for form components
         """
-        # Create login frame with increased size
+        # Create login frame with fixed dimensions
         self.frame = tk.Frame(
             self.parent, 
-            bg=Colors.BLACK, 
-            width=500,  # Increased from 500
-            height=800  # Increased from 600
+            bg=Colors.BLACK,
+            width=450,
+            height=575
         )
         self.frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+        self.frame.pack_propagate(False)  # Maintain fixed size
         
         # Add padding container
         self.container = tk.Frame(self.frame, bg=Colors.BLACK)
-        self.container.pack(fill=tk.BOTH, expand=True, padx=50, pady=40)
+        self.container.pack(fill=tk.BOTH, expand=True, padx=40, pady=30)
         
         return self.container
     

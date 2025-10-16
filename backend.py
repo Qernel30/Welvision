@@ -126,9 +126,9 @@ def capture_frames_bigface(shared_frame_bigface, frame_lock_bigface,frame_shape)
         
 def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_queue_bigface, model_bigface_path, proximity_count_bigface, roller_updation_dict, queue_lock, shared_data, frame_shape, shared_annotated_bigface, annotated_frame_lock_bigface):
     """Process frames for YOLO inference."""
-    detected_folder = "captured_bigface_frames"
+    detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\BF\\Defect"
     os.makedirs(detected_folder, exist_ok=True)
-    head_folder="captured_head_frames"
+    head_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\BF\\Head_Defect"
     os.makedirs(head_folder, exist_ok=True)
     bf_triggered = False
     roller_dict = {}
@@ -392,7 +392,7 @@ def capture_frames_od(shared_frame_od, frame_lock_od,frame_shape):
 def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_lock, shared_data, frame_shape, roller_updation_dict,shared_annotated_od, annotated_frame_lock_od):
     """Process frames for YOLO inference and track roller defects with pulse debounce & proper exit handling."""
 
-    detected_folder = "captured_od_frames"
+    detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\OD\\Defect"
     os.makedirs(detected_folder, exist_ok=True)
 
     def point_inside(rectangle, list_of_all_rollers , roller_number): #COORDINATES, NO OF ROLLERS IN FRAME, TOTAL ROLLERS

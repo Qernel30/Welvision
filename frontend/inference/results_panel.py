@@ -1,0 +1,198 @@
+"""
+Results Panel Component
+Displays inspection results for Bigface, OD, and Overall
+"""
+
+import tkinter as tk
+from ..utils.styles import Colors, Fonts
+
+
+class ResultsPanel:
+    """Results display panel at the bottom of inference tab."""
+    
+    def __init__(self, parent, app_instance):
+        """
+        Initialize the results panel.
+        
+        Args:
+            parent: Parent frame
+            app_instance: Reference to main app instance
+        """
+        self.parent = parent
+        self.app = app_instance
+        self.result_vars = {}
+        
+    def create(self):
+        """Create the results panel UI."""
+        # Main container - not expanding to full width
+        container = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
+        container.pack(anchor=tk.W, padx=5, pady=5)
+        
+        # Create three result sections
+        self._create_bigface_results(container, 0)
+        self._create_od_results(container, 1)
+        self._create_overall_results(container, 2)
+        
+        # Create roller info section (4th column)
+        self._create_roller_info(container, 3)
+        
+        # Configure grid weights - optimized width for each column
+        for i in range(4):
+            container.grid_columnconfigure(i, weight=0, minsize=310)
+        
+        return container
+    
+    def _create_result_section(self, parent, title, column, prefix):
+        """Create a result section frame."""
+        frame = tk.LabelFrame(
+            parent,
+            text=title,
+            font=Fonts.TEXT_BOLD,
+            fg=Colors.WHITE,
+            bg=Colors.PRIMARY_BG,
+            bd=2,
+            relief=tk.RIDGE
+        )
+        frame.grid(row=0, column=column, padx=8, pady=2, sticky="nsew")
+        
+        inner_frame = tk.Frame(frame, bg=Colors.PRIMARY_BG)
+        inner_frame.pack(padx=20, pady=10, fill=tk.BOTH, expand=True)
+        
+        # Create result rows
+        self._create_result_row(inner_frame, "Inspected :", f"{prefix}_inspected", 0)
+        self._create_result_row(inner_frame, "Ok rollers :", f"{prefix}_ok", 1)
+        self._create_result_row(inner_frame, "Not OK rollers:", f"{prefix}_not_ok", 2)
+        self._create_result_row(inner_frame, "Percentage:", f"{prefix}_percentage", 3)
+        
+        return frame
+    
+    def _create_result_row(self, parent, label_text, var_key, row):
+        """Create a single result row."""
+        row_frame = tk.Frame(parent, bg=Colors.PRIMARY_BG)
+        row_frame.pack(fill=tk.X, pady=3)
+        
+        # Label
+        label = tk.Label(
+            row_frame,
+            text=label_text,
+            font=Fonts.TEXT_BOLD,  # Larger bold text
+            fg=Colors.WHITE,
+            bg=Colors.PRIMARY_BG,
+            anchor="w"
+        )
+        label.pack(side=tk.LEFT)
+        
+        # Value with colored text
+        self.result_vars[var_key] = tk.StringVar(value="0" if "percentage" not in var_key else "0.0%")
+        value_label = tk.Label(
+            row_frame,
+            textvariable=self.result_vars[var_key],
+            font=Fonts.TEXT_BOLD,  # Larger bold text
+            fg="#00ff00" if "percentage" not in var_key else "#ffff00",  # Green for numbers, Yellow for percentage
+            bg=Colors.PRIMARY_BG,
+            anchor="e"
+        )
+        value_label.pack(side=tk.RIGHT)
+    
+    def _create_bigface_results(self, parent, column):
+        """Create Bigface results section."""
+        self._create_result_section(parent, "Bigface Result:", column, "bf")
+    
+    def _create_od_results(self, parent, column):
+        """Create OD results section."""
+        self._create_result_section(parent, "OD Result:", column, "od")
+    
+    def _create_overall_results(self, parent, column):
+        """Create Overall results section."""
+        self._create_result_section(parent, "Overall Result:", column, "overall")
+    
+    def _create_roller_info(self, parent, column):
+        """Create roller info section with two columns."""
+        frame = tk.LabelFrame(
+            parent,
+            text="Roller Info:",
+            font=Fonts.TEXT_BOLD,
+            fg=Colors.WHITE,
+            bg=Colors.PRIMARY_BG,
+            bd=2,
+            relief=tk.RIDGE
+        )
+        frame.grid(row=0, column=column, padx=8, pady=2, sticky="nsew")
+        
+        inner_frame = tk.Frame(frame, bg=Colors.PRIMARY_BG)
+        inner_frame.pack(padx=20, pady=10, fill=tk.BOTH, expand=True)
+        
+        # Left column
+        left_col = tk.Frame(inner_frame, bg=Colors.PRIMARY_BG)
+        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        
+        self._create_info_row(left_col, "Outer Diameter :", "outer_diameter", "25 mm")
+        self._create_info_row(left_col, "Dimple Diameter:", "dimple_diameter", "20 mm")
+        self._create_info_row(left_col, "Small Diameter :", "small_diameter", "15 mm")
+        
+        # Right column
+        right_col = tk.Frame(inner_frame, bg=Colors.PRIMARY_BG)
+        right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
+        
+        self._create_info_row(right_col, "Roller Length :", "roller_length", "40.25 mm")
+        self._create_info_row(right_col, "High Head (pixels):", "high_head", "0 pixels")
+        self._create_info_row(right_col, "Down Head (pixels):", "down_head", "0 pixels")
+    
+    def _create_info_row(self, parent, label_text, var_key, default_value):
+        """Create a single roller info row."""
+        row_frame = tk.Frame(parent, bg=Colors.PRIMARY_BG)
+        row_frame.pack(fill=tk.X, pady=5)
+        
+        # Create inner frame for horizontal layout
+        inner_frame = tk.Frame(row_frame, bg=Colors.PRIMARY_BG)
+        inner_frame.pack(fill=tk.X)
+        
+        # Label (left side)
+        label = tk.Label(
+            inner_frame,
+            text=label_text,
+            font=Fonts.TEXT_BOLD,  # Increased font size to match other results
+            fg=Colors.WHITE,
+            bg=Colors.PRIMARY_BG,
+            anchor="w"
+        )
+        label.pack(side=tk.LEFT)
+        
+        # Value (right side)
+        self.result_vars[var_key] = tk.StringVar(value=default_value)
+        value_label = tk.Label(
+            inner_frame,
+            textvariable=self.result_vars[var_key],
+            font=Fonts.TEXT_BOLD,  # Increased font size to match other results
+            fg="#00bfff",  # Sky blue color for values
+            bg=Colors.PRIMARY_BG,
+            anchor="e"
+        )
+        value_label.pack(side=tk.RIGHT)
+    
+    def update_results(self, section, inspected, ok_rollers, not_ok_rollers, percentage):
+        """
+        Update results for a specific section.
+        
+        Args:
+            section: 'bf', 'od', or 'overall'
+            inspected: Number of inspected rollers
+            ok_rollers: Number of OK rollers
+            not_ok_rollers: Number of not OK rollers
+            percentage: Percentage value
+        """
+        self.result_vars[f"{section}_inspected"].set(str(inspected))
+        self.result_vars[f"{section}_ok"].set(str(ok_rollers))
+        self.result_vars[f"{section}_not_ok"].set(str(not_ok_rollers))
+        self.result_vars[f"{section}_percentage"].set(f"{percentage:.1f}%")
+    
+    def update_roller_info(self, **kwargs):
+        """
+        Update roller information.
+        
+        Args:
+            **kwargs: Key-value pairs to update (e.g., outer_diameter="25 mm")
+        """
+        for key, value in kwargs.items():
+            if key in self.result_vars:
+                self.result_vars[key].set(value)

@@ -1,5 +1,6 @@
 """
 Inference Tab UI Component
+Modularized layout with status panel, camera feeds, results, and roller info
 """
 
 import tkinter as tk
@@ -8,9 +9,11 @@ import time
 import threading
 from ..utils.styles import Colors
 from ..utils.config import AppConfig
+from .status_panel import StatusPanel
 from .camera_feed import CameraFeedManager
 from .control_panel import ControlPanel
-from .threshold_panel import ThresholdPanel
+from .results_panel import ResultsPanel
+from .roller_info_panel import RollerInfoPanel
 
 
 class InferenceTab:
@@ -28,23 +31,40 @@ class InferenceTab:
         self.app = app_instance
         
         # Components
+        self.status_panel = None
         self.camera_manager = None
         self.control_panel = None
-        self.threshold_panel = None
+        self.results_panel = None
+        self.roller_info_panel = None
         
     def setup(self):
-        """Setup the inference tab UI."""
-        # Setup camera feeds
-        self.camera_manager = CameraFeedManager(self.parent)
-        feeds = self.camera_manager.setup()
+        """Setup the inference tab UI in a single-frame layout."""
+        # Main container
+        main_container = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
+        main_container.pack(fill=tk.BOTH, expand=True)
         
-        # Setup control panel
-        self.control_panel = ControlPanel(self.parent, self.app)
+        # Top section: Status panel
+        self.status_panel = StatusPanel(main_container, self.app)
+        self.status_panel.create()
+        
+        # Middle section: Camera feeds only (full width)
+        middle_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
+        middle_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.camera_manager = CameraFeedManager(middle_frame)
+        self.camera_manager.setup()
+        
+        # Bottom section: Results with roller info and control panel
+        bottom_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
+        bottom_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Results panel (includes roller info now)
+        self.results_panel = ResultsPanel(bottom_frame, self.app)
+        self.results_panel.create()
+        
+        # Control panel
+        self.control_panel = ControlPanel(bottom_frame, self.app)
         self.control_panel.setup()
-        
-        # Setup threshold panel
-        self.threshold_panel = ThresholdPanel(self.parent, self.app)
-        self.threshold_panel.setup()
     
     def update_od_camera(self):
         """Update OD camera feed display."""

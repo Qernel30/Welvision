@@ -87,6 +87,9 @@ class WelVisionApp(tk.Tk):
         self.shared_data = None
         self.manager = None
         
+        # Footer
+        self.footer_frame = None
+        
         # Show login page
         self.show_login_page()
     
@@ -103,6 +106,29 @@ class WelVisionApp(tk.Tk):
         # Show login page
         self.login_page = LoginPage(self, self.on_login_success)
         self.login_page.show()
+        
+        # Add global footer
+        self._create_global_footer()
+    
+    def _create_global_footer(self):
+        """Create footer with company name that appears on all pages."""
+        # Remove existing footer if present
+        if hasattr(self, 'footer_frame') and self.footer_frame:
+            self.footer_frame.destroy()
+        
+        # Create footer frame
+        self.footer_frame = tk.Frame(self, bg=Colors.PRIMARY_BG)
+        self.footer_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(5, 5))
+        
+        # Create company label with larger font
+        company_label = tk.Label(
+            self.footer_frame,
+            text="© Welvision Pvt Limited",
+            font=Fonts.HEADER,  # Using HEADER font (16pt bold) for larger size
+            fg="#888888",
+            bg=Colors.PRIMARY_BG
+        )
+        company_label.pack(side=tk.RIGHT, padx=20)
     
     def on_login_success(self, email, role):
         """
@@ -146,6 +172,9 @@ class WelVisionApp(tk.Tk):
         # Create content frame for tabs
         self.content_frame = tk.Frame(main_frame, bg=Colors.PRIMARY_BG)
         self.content_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        # Add global footer
+        self._create_global_footer()
         
         # Show initial tab (Inference)
         self.show_tab("inference")

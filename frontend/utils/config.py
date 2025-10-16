@@ -12,8 +12,8 @@ class AppConfig:
     WINDOW_TITLE = "WELVISION"
     
     # Camera settings
-    CAMERA_WIDTH = 400
-    CAMERA_HEIGHT = 250
+    CAMERA_WIDTH = 580
+    CAMERA_HEIGHT = 380
     FRAME_UPDATE_RATE = 0.03  # 30ms = ~33 FPS
     
     # PLC settings
@@ -35,9 +35,6 @@ class AppConfig:
     WARMUP_BF = r"Warmup BF.jpg"
     WARMUP_OD = r"Warmup OD.jpg"
     
-    # CSV log files
-    CSV_BIGFACE = "bigface_defects_log.csv"
-    CSV_OD = "od_defects_log.csv"
     
     # Captured frames directories
     DIR_BIGFACE_FRAMES = "captured_bigface_frames"

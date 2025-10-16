@@ -23,9 +23,9 @@ class NavConfig:
     
     # Navbar styling
     NAVBAR_HEIGHT = 50
-    BUTTON_GAP = 5  # Gap between buttons in pixels
-    NAVBAR_PADDING_X = 10
-    NAVBAR_PADDING_Y = 5
+    BUTTON_GAP = 3  # Gap between buttons in pixels
+    NAVBAR_PADDING_X = 5
+    NAVBAR_PADDING_Y = 3
     
     @classmethod
     def get_button_configs(cls):
