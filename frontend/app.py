@@ -19,6 +19,7 @@ from .navbar import NavBarManager
 from .inference import InferenceTab
 from .statistics import StatisticsTab
 from .settings import SettingsTab
+from .model_management import ModelManagementTab
 from backend import (
     plc_communication,
     capture_frames_bigface,
@@ -76,6 +77,7 @@ class WelVisionApp(tk.Tk):
         self.inference_tab = None
         self.statistics_tab = None
         self.settings_tab = None
+        self.model_management_tab = None
         
         # Content frame reference
         self.content_frame = None
@@ -462,7 +464,8 @@ class WelVisionApp(tk.Tk):
             self.settings_tab.setup()
         
         elif tab_id == "model_management":
-            self._show_placeholder_tab("Model Management Tab", "YOLO model training and management")
+            self.model_management_tab = ModelManagementTab(self.current_tab_frame, self)
+            self.model_management_tab.setup()
         
         elif tab_id == "user_management":
             self._show_placeholder_tab("User Management Tab", "User accounts and permissions")

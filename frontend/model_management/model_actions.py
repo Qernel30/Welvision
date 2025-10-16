@@ -1,0 +1,127 @@
+"""
+Model Actions Component
+Handles view details and delete model operations
+"""
+
+import tkinter as tk
+from tkinter import messagebox
+import os
+from ..utils.styles import Colors, Fonts
+from .model_database import ModelDatabase
+from .model_details_dialog import ModelDetailsDialog
+
+
+class ModelActions:
+    """Action buttons for model operations."""
+    
+    def __init__(self, parent, tab_instance):
+        """
+        Initialize model actions.
+        
+        Args:
+            parent: Parent frame
+            tab_instance: Reference to ModelManagementTab instance
+        """
+        self.parent = parent
+        self.tab = tab_instance
+        
+    def create(self):
+        """Create the action buttons UI."""
+        # Actions frame
+        actions_frame = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
+        actions_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        # Info label (left)
+        info_label = tk.Label(
+            actions_frame,
+            text="💡 Double-click on any model to view details",
+            font=Fonts.TEXT_BOLD,
+            fg="#ffff00",
+            bg=Colors.PRIMARY_BG
+        )
+        info_label.pack(side=tk.LEFT, padx=5)
+        
+        # Status label (center)
+        self.status_label = tk.Label(
+            actions_frame,
+            text="Ready",
+            font=Fonts.TEXT_BOLD,
+            fg="#00ff00",
+            bg=Colors.PRIMARY_BG
+        )
+        self.status_label.pack(side=tk.LEFT, expand=True)
+        
+        # Delete Model button (right)
+        delete_button = tk.Button(
+            actions_frame,
+            text="Delete Model",
+            font=Fonts.TEXT_BOLD,
+            bg=Colors.DANGER,
+            fg=Colors.WHITE,
+            command=self._delete_model,
+            cursor="hand2",
+            relief=tk.RAISED,
+            bd=2,
+            padx=30,
+            pady=8
+        )
+        delete_button.pack(side=tk.RIGHT, padx=5)
+    
+    def _delete_model(self):
+        """Delete selected model."""
+        model = self.tab.get_selected_model()
+        
+        if not model:
+            messagebox.showwarning("No Selection", "Please select a model to delete!")
+            return
+        
+        # Confirm deletion
+        confirm = messagebox.askyesno(
+            "Confirm Deletion",
+            f"Are you sure you want to delete the model:\n\n"
+            f"Name: {model['model_name']}\n"
+            f"Type: {model['model_type']}\n\n"
+            f"This will remove the database entry and delete the model file.\n"
+            f"This action cannot be undone!"
+        )
+        
+        if not confirm:
+            return
+        
+        try:
+            # Delete from database
+            db = ModelDatabase()
+            if db.connect():
+                success = db.delete_model(model['id'], model['model_type'])
+                db.disconnect()
+                
+                if success:
+                    # Delete file from disk
+                    try:
+                        if os.path.exists(model['model_path']):
+                            os.remove(model['model_path'])
+                            print(f"✅ Deleted model file: {model['model_path']}")
+                    except Exception as e:
+                        print(f"⚠ Warning: Could not delete file: {e}")
+                    
+                    messagebox.showinfo(
+                        "Success",
+                        f"Model '{model['model_name']}' deleted successfully!"
+                    )
+                    
+                    # Refresh table
+                    self.tab.refresh_models()
+                    self.status_label.config(text="Model deleted", fg="#00ff00")
+                else:
+                    messagebox.showerror("Error", "Failed to delete model from database!")
+                    self.status_label.config(text="Delete failed", fg="#ff0000")
+            else:
+                messagebox.showerror("Error", "Failed to connect to database!")
+                self.status_label.config(text="Database error", fg="#ff0000")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to delete model:\n{str(e)}")
+            self.status_label.config(text="Error", fg="#ff0000")
+            print(f"❌ Delete error: {e}")
+            import traceback
+            traceback.print_exc()
