@@ -82,7 +82,7 @@ class ControlPanel:
         
         # Allow all images checkbox
         self.allow_images_var = tk.BooleanVar(value=False)
-        checkbox = tk.Checkbutton(
+        self.allow_images_checkbox = tk.Checkbutton(
             control_frame,
             text="Allow all images",
             font=Fonts.TEXT,
@@ -94,7 +94,7 @@ class ControlPanel:
             variable=self.allow_images_var,
             command=self._toggle_allow_images
         )
-        checkbox.pack(side=tk.LEFT, padx=30, pady=5)
+        self.allow_images_checkbox.pack(side=tk.LEFT, padx=30, pady=5)
         
         # Apply inspection state if inspection is running
         self._restore_inspection_state()
@@ -188,17 +188,30 @@ class ControlPanel:
         """Toggle allow all images setting."""
         status = "enabled" if self.allow_images_var.get() else "disabled"
         print(f"Allow all images: {status}")
+        
+        # Update shared_data if available (will be used when inspection starts)
+        if hasattr(self.app, 'shared_data') and self.app.shared_data is not None:
+            self.app.shared_data['allow_all'] = self.allow_images_var.get()
+            print(f"✅ Updated shared_data['allow_all'] = {self.allow_images_var.get()}")
     
     def _restore_inspection_state(self):
         """Restore button states if inspection is running."""
         # Check if inspection is currently running
         if hasattr(self.app, 'inspection_running') and self.app.inspection_running:
-            print("🔄 Restoring inspection state after tab switch...")
             # Apply inspection state to control panel buttons (without re-disabling tabs)
             self.state_manager.restore_control_panel_state(self)
     
     def _on_start_inspection(self):
         """Handle start button click and monitor system readiness."""
+        # Set the allow_all flag in shared_data before starting inspection
+        if hasattr(self.app, 'shared_data') and self.app.shared_data is not None:
+            self.app.shared_data['allow_all'] = self.allow_images_var.get()
+            print(f"🚀 Starting inspection with allow_all = {self.allow_images_var.get()}")
+        
+        # Disable the allow_images checkbox during inspection
+        if self.allow_images_checkbox:
+            self.allow_images_checkbox.config(state=tk.DISABLED)
+        
         # Apply all UI state changes for inspection start
         self.state_manager.on_inspection_start(self)
         
@@ -229,6 +242,10 @@ class ControlPanel:
         # Stop the inspection process
         self.app.stop_inspection()
         
+        # Re-enable the allow_images checkbox after inspection stops
+        if self.allow_images_checkbox:
+            self.allow_images_checkbox.config(state=tk.NORMAL)
+        
         # Apply all UI state changes for inspection stop
         self.state_manager.on_inspection_stop(self)
     
@@ -240,6 +257,9 @@ class ControlPanel:
             self.stop_button.config(state=tk.DISABLED, bg="#6c757d")
         if self.reset_button:
             self.reset_button.config(state=tk.NORMAL, bg="#ff8c00")
+        # Re-enable allow_images checkbox when inspection is not running
+        if self.allow_images_checkbox:
+            self.allow_images_checkbox.config(state=tk.NORMAL)
     
     def enable_stop(self):
         """Enable the stop button and disable start button."""
@@ -247,3 +267,6 @@ class ControlPanel:
             self.start_button.config(state=tk.DISABLED, bg="#6c757d")
         if self.stop_button:
             self.stop_button.config(state=tk.NORMAL, bg=Colors.DANGER)
+        # Keep allow_images checkbox disabled during inspection
+        if self.allow_images_checkbox:
+            self.allow_images_checkbox.config(state=tk.DISABLED)

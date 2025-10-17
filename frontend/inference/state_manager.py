@@ -81,6 +81,10 @@ class InspectionStateManager:
                 fg=Colors.WHITE  # White text
             )
     
+        # 4. Disable Allow All Images checkbox during inspection
+        if hasattr(control_panel, 'allow_images_checkbox') and control_panel.allow_images_checkbox:
+            control_panel.allow_images_checkbox.config(state=tk.DISABLED)
+    
     def on_inspection_stop(self, control_panel):
         """
         Handle UI state changes when inspection stops.
@@ -112,13 +116,17 @@ class InspectionStateManager:
                 fg=Colors.WHITE  # White text
             )
         
-        # 4. Enable Logout button with red color and white text
+        # 4. Re-enable Allow All Images checkbox
+        if hasattr(control_panel, 'allow_images_checkbox') and control_panel.allow_images_checkbox:
+            control_panel.allow_images_checkbox.config(state=tk.NORMAL)
+        
+        # 5. Enable Logout button with red color and white text
         self._enable_logout_button()
         
-        # 5. Enable the Close button (top right X)
+        # 6. Enable the Close button (top right X)
         self._enable_window_close()
         
-        # 6. Enable all tabs with normal colors
+        # 7. Enable all tabs with normal colors
         self._enable_all_tabs()
     
     def _disable_logout_button(self):

@@ -226,9 +226,10 @@ class WelVisionApp(tk.Tk):
         self.shared_data["bf_ready"] = False
         self.shared_data["od_ready"] = False
         self.shared_data["overall_system_ready"] = False
-        self.shared_data["system_mode"] = False  # False = MANUAL (default)
-        self.shared_data["system_ready"] = False  # False = NOT READY (default)
-        self.shared_data["disc_status"] = False  # False = NOT READY (default)
+        self.shared_data["system_mode"] = False 
+        self.shared_data["system_ready"] = False 
+        self.shared_data["disc_status"] = False 
+        self.shared_data["allow_all"] = False 
         
         # BF Defect Statistics
         self.shared_data["bf_inspected"] = 0

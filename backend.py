@@ -8,6 +8,7 @@ import numpy as np
 import os
 from ultralytics import YOLO
 import torch
+from datetime import datetime
 
 def plc_communication(plc_ip, rack, slot, db_number, shared_data, command_queue):
     """
@@ -128,6 +129,10 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
     os.makedirs(detected_folder, exist_ok=True)
     head_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\BF\\Head_Defect"
     os.makedirs(head_folder, exist_ok=True)
+    allow_all_folder_bf = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\BF\\All_BF"
+    os.makedirs(allow_all_folder_bf, exist_ok=True)
+    allow_all_folder_head = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\BF\\All_Head"
+    os.makedirs(allow_all_folder_head, exist_ok=True)
     bf_triggered = False
     roller_dict = {}
     previous_head_status = False
@@ -203,7 +208,7 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
     shared_data["bf_down_head"] = 0
     shared_data["bf_others"] = 0
 
-    
+    allow_all = shared_data.get("allow_all", False)    
     while True:
         
         current_bf_state = shared_data["bigface_presence"]
@@ -256,20 +261,23 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
                 defect_names = roller_dict[roller_id_counter]['defect_names'] + [head_type]
                 roller_dict[roller_id_counter] = {'defect': data, 'defect_names': defect_names}
 
-            annotated_frame = results[0].plot()
+                annotated_frame = results[0].plot()
 
-            roller_text = f"Roller Id : {roller_id_counter}"
-            head_type_text = f"Head Type : {head_type}"
-            distance_text = f"Distance : {distance_pixels:.2f}mm"
+                roller_text = f"Roller Id : {roller_id_counter}"
+                head_type_text = f"Head Type : {head_type}"
+                distance_text = f"Distance : {distance_pixels:.2f}mm"
 
-            cv2.putText(annotated_frame, roller_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            cv2.putText(annotated_frame, head_type_text, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            cv2.putText(annotated_frame, distance_text, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            
-            frame_number_head += 1
-            annotated_frame = results[0].plot()
-            save_path = f"{head_folder}/frame{frame_number_head}.jpg"
-            cv2.imwrite(save_path, annotated_frame)
+                cv2.putText(annotated_frame, roller_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                cv2.putText(annotated_frame, head_type_text, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                cv2.putText(annotated_frame, distance_text, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                
+                annotated_frame = results[0].plot()
+                save_path = f"{head_folder}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                cv2.imwrite(save_path, annotated_frame)
+
+                if allow_all:
+                    allow_all_path = f"{allow_all_folder_head}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                    cv2.imwrite(allow_all_path, annotated_frame)
     
 
         previous_head_status = current_head_state
@@ -299,20 +307,20 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
 
             filtered_detections = detections_for_filter
             detections = sorted(filtered_detections, key=lambda x: x[1])  # Sort by x-coordinate
-            frame_number += 1
-            # annotated_frame = results[0].plot()
+            annotated_frame = results[0].plot()
             
             # Check for roller and defect detections
-            # has_roller_detection = any(detection[0] == "roller" for detection in detections)
-            # has_defect_detection = any(detection[0] != "roller" for detection in detections)
+            has_roller_detection = any(detection[0] == "roller" for detection in detections)
+            has_defect_detection = any(detection[0] != "roller" for detection in detections)
+
+            if allow_all and has_roller_detection:
+                allow_all_path = f"{allow_all_folder_bf}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                cv2.imwrite(allow_all_path, annotated_frame)            
+            if has_roller_detection and has_defect_detection:
+                save_path = f"{detected_folder}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                cv2.imwrite(save_path, annotated_frame)
 
             if len(detections) > 0:
-
-                frame_number += 1
-                annotated_frame = results[0].plot()
-                save_path = f"{detected_folder}/frame{frame_number}.jpg"
-                cv2.imwrite(save_path, annotated_frame)
-    
                 with annotated_frame_lock_bigface:
                     np_annotated = np.frombuffer(shared_annotated_bigface.get_obj(), dtype=np.uint8).reshape(frame_shape)
                     np.copyto(np_annotated, annotated_frame)
@@ -429,6 +437,8 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
 
     detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\OD\\Defect"
     os.makedirs(detected_folder, exist_ok=True)
+    allow_all_folder_od = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\OD\\All_OD"
+    os.makedirs(allow_all_folder_od, exist_ok=True)
 
     def point_inside(rectangle, list_of_all_rollers , roller_number): #COORDINATES, NO OF ROLLERS IN FRAME, TOTAL ROLLERS
         
@@ -480,6 +490,7 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
     shared_data["od_spherical_mark"] = 0
     shared_data["od_others"] = 0
 
+    allow_all = shared_data.get("allow_all", False)
     while True:
         current_od_state = shared_data["od_presence"]
 
@@ -504,14 +515,20 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
             ] if results and results[0].boxes.data is not None else []
             
             detections = sorted(detections, key=lambda x: x[1])  # Sort by x-coordinate
+            annotated_frame = results[0].plot()
 
-            if len(detections) > 0:
-                
-                frame_number += 1
-                annotated_frame = results[0].plot()
-                save_path = f"{detected_folder}/frame{frame_number}.jpg"
+            # Check for roller and defect detections
+            has_roller_detection = any(detection[0] == "roller" for detection in detections)
+            has_defect_detection = any(detection[0] != "roller" for detection in detections)
+
+            if allow_all and has_roller_detection:
+                allow_all_path = f"{allow_all_folder_od}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                cv2.imwrite(allow_all_path, annotated_frame)
+            if has_roller_detection and has_defect_detection:
+                save_path = f"{detected_folder}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
                 cv2.imwrite(save_path, annotated_frame)
 
+            if len(detections) > 0:
                 with annotated_frame_lock_od:
                     np_annotated = np.frombuffer(shared_annotated_od.get_obj(), dtype=np.uint8).reshape(frame_shape)
                     np.copyto(np_annotated, annotated_frame)
