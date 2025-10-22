@@ -65,11 +65,17 @@ class NavButton:
     
     def _on_hover(self, event):
         """Handle mouse hover."""
+        # Don't change color if button is disabled or active
+        if self.button['state'] == tk.DISABLED:
+            return
         if not self.is_active:
             self.button.config(bg=self.hover_bg)
     
     def _on_leave(self, event):
         """Handle mouse leave."""
+        # Don't change color if button is disabled
+        if self.button['state'] == tk.DISABLED:
+            return
         if not self.is_active:
             self.button.config(bg=self.inactive_bg)
     

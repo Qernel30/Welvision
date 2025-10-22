@@ -434,6 +434,10 @@ class SettingsTab:
         self._block_model_dropdowns()
         self._block_save_button()
         
+        # Block app closing when preview is running
+        if hasattr(self.app, 'protocol'):
+            self.app.protocol("WM_DELETE_WINDOW", self._block_closing)
+        
         # Start camera update threads
         self._start_preview_threads()    
     
@@ -480,6 +484,10 @@ class SettingsTab:
         self._unblock_model_dropdowns()
         self._unblock_save_button()
         
+        # Restore app closing
+        if hasattr(self.app, 'on_closing'):
+            self.app.protocol("WM_DELETE_WINDOW", self.app.on_closing)
+        
         # Display black screens on both feeds
         self._display_black_screens()
 
@@ -513,9 +521,6 @@ class SettingsTab:
             self.preview_od_camera_process.terminate()
             self.preview_od_camera_process.join(timeout=1)
             self.preview_od_camera_process = None
-        
-        
-        
     
     def _start_camera_capture_processes(self):
         """Start camera capture processes for preview mode."""
@@ -903,6 +908,14 @@ class SettingsTab:
         od_conf_changed = abs(current_od_conf - self.threshold_snapshot['od_conf']) > 0.001
         
         return bf_changed or od_changed or bf_conf_changed or od_conf_changed
+    
+    def _block_closing(self):
+        """Block app closing when preview is running."""
+        messagebox.showwarning(
+            "Preview Running",
+            "Camera preview is currently running!\n\n"
+            "Please stop the preview before closing the application."
+        )
     
     def cleanup(self):
         """Cleanup method called when settings tab is destroyed."""

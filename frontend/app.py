@@ -21,6 +21,7 @@ from .statistics import StatisticsTab
 from .settings import SettingsTab
 from .model_management import ModelManagementTab
 from .diagnosis import DiagnosisTab
+from .system_check import SystemCheckTab
 from backend import (
     plc_communication,
     capture_frames_bigface,
@@ -111,6 +112,7 @@ class WelVisionApp(tk.Tk):
         self.settings_tab = None
         self.model_management_tab = None
         self.diagnosis_tab = None
+        self.system_check_tab = None
         
         # Content frame reference
         self.content_frame = None
@@ -331,7 +333,7 @@ class WelVisionApp(tk.Tk):
         self.shared_data["disc_status"] = False 
         self.shared_data["allow_all"] = False 
         
-        # BF Defect Statistics
+        # BF Defect Statistics (Inference)
         self.shared_data["bf_inspected"] = 0
         self.shared_data["bf_ok_rollers"] = 0
         self.shared_data["bf_not_ok_rollers"] = 0
@@ -342,7 +344,7 @@ class WelVisionApp(tk.Tk):
         self.shared_data["down_head"] = 0
         self.shared_data["others"] = 0
         
-        # OD Defect Statistics
+        # OD Defect Statistics (Inference)
         self.shared_data["od_inspected"] = 0
         self.shared_data["od_ok_rollers"] = 0
         self.shared_data["od_not_ok_rollers"] = 0
@@ -352,6 +354,17 @@ class WelVisionApp(tk.Tk):
         self.shared_data["od_damage_on_end"] = 0
         self.shared_data["od_spherical_mark"] = 0
         self.shared_data["od_others"] = 0
+        
+        # System Check Statistics (Pattern-based control)
+        self.shared_data["system_check_bf_processed"] = 0
+        self.shared_data["system_check_bf_accepted"] = 0
+        self.shared_data["system_check_bf_rejected"] = 0
+        self.shared_data["system_check_od_processed"] = 0
+        self.shared_data["system_check_od_accepted"] = 0
+        self.shared_data["system_check_od_rejected"] = 0
+        self.shared_data["system_check_total_passed"] = 0
+        self.shared_data["system_check_total_accepted"] = 0
+        self.shared_data["system_check_total_rejected"] = 0
         
         # Track inspection session start time
         self.inspection_start_time = None
@@ -588,7 +601,8 @@ class WelVisionApp(tk.Tk):
             self._show_placeholder_tab("User Management Tab", "User accounts and permissions")
         
         elif tab_id == "system_check":
-            self._show_placeholder_tab("System Check Tab", "Hardware and connection diagnostics")
+            self.system_check_tab = SystemCheckTab(self.current_tab_frame, self)
+            self.system_check_tab.setup()
         
         elif tab_id == "info":
             self.statistics_tab = StatisticsTab(self.current_tab_frame, self)
