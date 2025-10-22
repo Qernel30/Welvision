@@ -78,7 +78,16 @@ class LoginPage:
         """Handle Enter key press with visual button feedback."""
         # Trigger button press animation with authentication callback
         if self.signin_button and self.signin_button.button:
-            self.signin_button.trigger_press_animation(callback=self._authenticate)
+            try:
+                # Check if button widget still exists
+                if self.signin_button.button.winfo_exists():
+                    self.signin_button.trigger_press_animation(callback=self._authenticate)
+                else:
+                    # Button destroyed, just authenticate
+                    self._authenticate()
+            except tk.TclError:
+                # Widget no longer exists, just authenticate
+                self._authenticate()
         else:
             # Fallback if button not available
             self._authenticate()

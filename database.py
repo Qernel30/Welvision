@@ -38,7 +38,6 @@ class RollerDatabase:
                 database=self.database
             )
             if self.connection.is_connected():
-                print(f"✅ Connected to MySQL database: {self.database}")
                 return True
         except Error as e:
             print(f"❌ Error connecting to MySQL database: {e}")
@@ -48,7 +47,6 @@ class RollerDatabase:
         """Close database connection."""
         if self.connection and self.connection.is_connected():
             self.connection.close()
-            print("✅ MySQL database connection closed")
     
     def insert_bf_tracking(self, employee_id, start_time, shared_data):
         """

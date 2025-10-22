@@ -43,6 +43,7 @@ class NavButton:
             fg=self.text_color,
             activebackground=self.hover_bg,
             activeforeground=self.text_color,
+            disabledforeground=self.text_color,  # Keep text white when disabled
             relief=tk.RAISED,
             bd=2,
             cursor="hand2",

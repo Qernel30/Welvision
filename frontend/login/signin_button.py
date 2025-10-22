@@ -57,13 +57,19 @@ class SignInButton:
         """Bind hover effects to the sign-in button."""
         def on_enter(event):
             """Handle mouse enter event."""
-            if not self._is_animating:
-                self.button.config(bg="#0056b3")  # Darker blue on hover
+            if not self._is_animating and self.button and self.button.winfo_exists():
+                try:
+                    self.button.config(bg="#0056b3")  # Darker blue on hover
+                except tk.TclError:
+                    pass
             
         def on_leave(event):
             """Handle mouse leave event."""
-            if not self._is_animating:
-                self.button.config(bg=Colors.PRIMARY_BLUE)  # Original blue
+            if not self._is_animating and self.button and self.button.winfo_exists():
+                try:
+                    self.button.config(bg=Colors.PRIMARY_BLUE)  # Original blue
+                except tk.TclError:
+                    pass
             
         self.button.bind("<Enter>", on_enter)
         self.button.bind("<Leave>", on_leave)
@@ -83,13 +89,25 @@ class SignInButton:
         Args:
             callback: Optional callback to execute after animation
         """
+        # Check if button exists before animating
+        if not self.button or not self.button.winfo_exists():
+            if callback:
+                callback()
+            return
+        
         self._is_animating = True
         
-        # Change to pressed state (darker)
-        self.button.config(bg="#FFFFFF", relief=tk.SUNKEN, text="Signing In...", fg="#000000")
-        
-        # Schedule return to normal state
-        self.button.after(150, lambda: self._reset_button_state(callback))
+        try:
+            # Change to pressed state (darker)
+            self.button.config(bg="#FFFFFF", relief=tk.SUNKEN, text="Signing In...", fg="#000000")
+            
+            # Schedule return to normal state
+            self.button.after(150, lambda: self._reset_button_state(callback))
+        except tk.TclError:
+            # Button was destroyed during animation
+            self._is_animating = False
+            if callback:
+                callback()
     
     def _reset_button_state(self, callback=None):
         """
@@ -98,27 +116,49 @@ class SignInButton:
         Args:
             callback: Optional callback to execute after reset
         """
-        self.button.config(
-            bg=Colors.PRIMARY_BLUE, 
-            relief=tk.FLAT,
-            text="Sign In",  # Restore original text
-            fg=Colors.WHITE  # Restore white text
-        )
-        self._is_animating = False
+        # Check if button exists before resetting
+        if not self.button or not self.button.winfo_exists():
+            self._is_animating = False
+            if callback:
+                callback()
+            return
         
-        # Execute callback if provided
-        if callback:
-            callback()
+        try:
+            self.button.config(
+                bg=Colors.PRIMARY_BLUE, 
+                relief=tk.FLAT,
+                text="Sign In",  # Restore original text
+                fg=Colors.WHITE  # Restore white text
+            )
+            self._is_animating = False
+            
+            # Execute callback if provided
+            if callback:
+                callback()
+        except tk.TclError:
+            # Button was destroyed during reset
+            self._is_animating = False
+            if callback:
+                callback()
     
     def reset_to_normal(self):
         """Force reset button to normal state (for failed authentication)."""
-        self.button.config(
-            bg=Colors.PRIMARY_BLUE,
-            relief=tk.FLAT,
-            text="Sign In",
-            fg=Colors.WHITE
-        )
-        self._is_animating = False
+        # Check if button exists before resetting
+        if not self.button or not self.button.winfo_exists():
+            self._is_animating = False
+            return
+        
+        try:
+            self.button.config(
+                bg=Colors.PRIMARY_BLUE,
+                relief=tk.FLAT,
+                text="Sign In",
+                fg=Colors.WHITE
+            )
+            self._is_animating = False
+        except tk.TclError:
+            # Button was destroyed
+            self._is_animating = False
     
     def trigger_press_animation(self, callback=None):
         """
@@ -127,6 +167,12 @@ class SignInButton:
         Args:
             callback: Optional callback to execute after animation
         """
+        # Check if button exists and is not already animating
+        if not self.button or not self.button.winfo_exists():
+            if callback:
+                callback()
+            return
+        
         if self._is_animating:
             return
         

@@ -159,6 +159,10 @@ class InferenceTab:
             # Update results panel from shared_data
             if self.results_panel:
                 self.results_panel.update_from_shared_data(self.app.shared_data)
+            
+            # Update model names in status panel
+            if self.status_panel:
+                self.status_panel.update_model_names()
         
         # Continue monitoring every 500ms
         self.parent.after(500, self._monitor_status_updates)

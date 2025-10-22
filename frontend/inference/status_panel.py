@@ -200,12 +200,12 @@ class StatusPanel:
             bg=Colors.PRIMARY_BG
         ).pack(side=tk.LEFT, padx=(0, 5))
         
-        self.status_vars['bf_model'] = tk.StringVar(value="BF_sr.pt")
+        self.status_vars['bf_model'] = tk.StringVar(value=self.app.selected_bf_model_name)
         tk.Label(
             bf_frame,
             textvariable=self.status_vars['bf_model'],
             font=Fonts.TEXT_BOLD,
-            fg="#ff6b6b",  # Red
+            fg="#4CAF50",  # Green for active model
             bg=Colors.PRIMARY_BG
         ).pack(side=tk.LEFT)
         
@@ -221,12 +221,12 @@ class StatusPanel:
             bg=Colors.PRIMARY_BG
         ).pack(side=tk.LEFT, padx=(0, 5))
         
-        self.status_vars['od_model'] = tk.StringVar(value="OD_sr.pt")
+        self.status_vars['od_model'] = tk.StringVar(value=self.app.selected_od_model_name)
         tk.Label(
             od_frame,
             textvariable=self.status_vars['od_model'],
             font=Fonts.TEXT_BOLD,
-            fg="#ff6b6b",  # Red
+            fg="#4CAF50",  # Green for active model
             bg=Colors.PRIMARY_BG
         ).pack(side=tk.LEFT)
     
@@ -246,3 +246,10 @@ class StatusPanel:
         """Update confidence threshold displays."""
         self.status_vars['bf_conf'].set(f"{int(self.app.bf_conf_threshold * 100)}.0%")
         self.status_vars['od_conf'].set(f"{int(self.app.od_conf_threshold * 100)}.0%")
+    
+    def update_model_names(self):
+        """Update AI model names from app."""
+        if hasattr(self.app, 'selected_bf_model_name'):
+            self.status_vars['bf_model'].set(self.app.selected_bf_model_name)
+        if hasattr(self.app, 'selected_od_model_name'):
+            self.status_vars['od_model'].set(self.app.selected_od_model_name)

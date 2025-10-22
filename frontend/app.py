@@ -30,6 +30,28 @@ from backend import (
     handle_slot_control_od,
 )
 
+import shutil
+import gc
+import torch
+import os
+
+def delete_all_pycache(start_path="."):
+    count = 0
+    for root, dirs, files in os.walk(start_path):
+        for dir_name in dirs:
+            if dir_name == "__pycache__":
+                full_path = os.path.join(root, dir_name)
+                shutil.rmtree(full_path)
+                count += 1
+
+def clear_gpu_memory():
+    """Clears GPU memory if applicable."""
+    try:
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+    except ImportError:
+        print("⚠️ PyTorch not installed; skipping GPU memory clearance.")
 
 class WelVisionApp(tk.Tk):
     """Main WelVision Application."""
@@ -71,6 +93,15 @@ class WelVisionApp(tk.Tk):
         self.od_conf_threshold = AppConfig.DEFAULT_OD_CONFIDENCE
         self.bf_conf_threshold = AppConfig.DEFAULT_BF_CONFIDENCE
         
+        # Selected model paths from Settings (will be loaded from database)
+        self.selected_bf_model_path = None
+        self.selected_bf_model_name = None
+        self.selected_od_model_path = None
+        self.selected_od_model_name = None
+        
+        # Load latest models from database on startup
+        self._load_latest_models_from_db()
+        
         # Page references
         self.login_page = None
         self.navbar_manager = None
@@ -97,6 +128,83 @@ class WelVisionApp(tk.Tk):
         
         # Show login page
         self.show_login_page()
+    
+    def _load_latest_models_from_db(self):
+        """Load the latest BF and OD models and their thresholds from database on app startup."""
+        try:
+            import mysql.connector
+            
+            connection = mysql.connector.connect(
+                host='localhost',
+                user='root',
+                password='root',
+                database='welvision_db'
+            )
+            
+            cursor = connection.cursor()
+            
+            # Load latest BF model
+            cursor.execute("SELECT model_name, model_path FROM bf_models ORDER BY upload_date DESC LIMIT 1")
+            bf_result = cursor.fetchone()
+            if bf_result:
+                self.selected_bf_model_name = bf_result[0]
+                self.selected_bf_model_path = bf_result[1]
+                
+                # Load latest BF threshold for this model
+                cursor.execute("""
+                    SELECT model_threshold 
+                    FROM bf_threshold_history 
+                    WHERE model_name = %s 
+                    ORDER BY change_timestamp DESC 
+                    LIMIT 1
+                """, (self.selected_bf_model_name,))
+                bf_threshold_result = cursor.fetchone()
+                if bf_threshold_result:
+                    self.bf_conf_threshold = float(bf_threshold_result[0])
+                else:
+                    print(f"⚠️ No threshold history for BF model '{self.selected_bf_model_name}', using default")
+            else:
+                # Fallback to default if no models in database
+                self.selected_bf_model_path = AppConfig.MODEL_BF_SR
+                self.selected_bf_model_name = "Default BF Model (No DB models)"
+                print(f"⚠️ No BF models in database, using default")
+            
+            # Load latest OD model
+            cursor.execute("SELECT model_name, model_path FROM od_models ORDER BY upload_date DESC LIMIT 1")
+            od_result = cursor.fetchone()
+            if od_result:
+                self.selected_od_model_name = od_result[0]
+                self.selected_od_model_path = od_result[1]
+                
+                # Load latest OD threshold for this model
+                cursor.execute("""
+                    SELECT model_threshold 
+                    FROM od_threshold_history 
+                    WHERE model_name = %s 
+                    ORDER BY change_timestamp DESC 
+                    LIMIT 1
+                """, (self.selected_od_model_name,))
+                od_threshold_result = cursor.fetchone()
+                if od_threshold_result:
+                    self.od_conf_threshold = float(od_threshold_result[0])
+                else:
+                    print(f"⚠️ No threshold history for OD model '{self.selected_od_model_name}', using default")
+            else:
+                # Fallback to default if no models in database
+                self.selected_od_model_path = AppConfig.MODEL_OD_SR
+                self.selected_od_model_name = "Default OD Model (No DB models)"
+                print(f"⚠️ No OD models in database, using default")
+            
+            cursor.close()
+            connection.close()
+            
+        except Exception as e:
+            print(f"❌ Error loading latest models from database: {e}")
+            # Fallback to default models on error
+            self.selected_bf_model_path = AppConfig.MODEL_BF_SR
+            self.selected_bf_model_name = "Default BF Model (DB Error)"
+            self.selected_od_model_path = AppConfig.MODEL_OD_SR
+            self.selected_od_model_name = "Default OD Model (DB Error)"
     
     def show_login_page(self):
         """Display the login page."""
@@ -145,7 +253,6 @@ class WelVisionApp(tk.Tk):
         """
         self.current_user = email
         self.current_role = role
-        print(f"✅ User logged in: {email} ({role})")
         self.show_main_interface()
     
     def show_main_interface(self):
@@ -195,16 +302,7 @@ class WelVisionApp(tk.Tk):
     
     def initialize_system(self):
         """Initialize the backend inspection system."""
-        print("Initializing backend system...")
         
-        
-        # Load YOLO models
-        print("Loading YOLO models...")
-        self.model_bigface = YOLO(AppConfig.MODEL_BF_SR)
-        self.model_od = YOLO(AppConfig.MODEL_OD_SR)
-        
-        self.model_bigface.to('cuda')
-        self.model_od.to('cuda')
         
         # Frame shape
         self.frame_shape = (
@@ -287,7 +385,6 @@ class WelVisionApp(tk.Tk):
         self.SLOT = AppConfig.PLC_SLOT
         self.DB_NUMBER = AppConfig.PLC_DB_NUMBER
         
-        print("✅ Backend system initialized successfully.")
     
     def create_processes(self):
         """Create process instances for backend operations."""
@@ -314,7 +411,7 @@ class WelVisionApp(tk.Tk):
                     self.shared_frame_bigface, 
                     self.frame_lock_bigface, 
                     self.roller_queue_bigface, 
-                    self.model_bigface, 
+                    self.selected_bf_model_path, 
                     self.proximity_count_bigface, 
                     self.roller_updation_dict, 
                     self.queue_lock, 
@@ -330,7 +427,8 @@ class WelVisionApp(tk.Tk):
                 args=(
                     self.shared_frame_od, 
                     self.frame_lock_od, 
-                    self.roller_queue_od, 
+                    self.roller_queue_od,
+                    self.selected_od_model_path, 
                     self.queue_lock, 
                     self.shared_data, 
                     self.frame_shape, 
@@ -377,7 +475,6 @@ class WelVisionApp(tk.Tk):
         for process in self.processes:
             process.start()
         
-        print("✅ Inspection started.")
     
     def stop_inspection(self):
         """Stop the inspection process."""
@@ -385,19 +482,15 @@ class WelVisionApp(tk.Tk):
             print("Inspection is not running.")
             return
         
-        # Create PLC client to turn off lights
-        plc_client = snap7.client.Client()
-        
+        plc_client = snap7.client.Client() 
         try:
             plc_client.connect(self.PLC_IP, self.RACK, self.SLOT)
-            print("✅ PLC Communication: Connected to PLC.")
             
             data = plc_client.read_area(Areas.DB, self.DB_NUMBER, 0, 2)
             set_bool(data, byte_index=1, bool_index=6, value=False)
             set_bool(data, byte_index=1, bool_index=7, value=False)
             plc_client.write_area(Areas.DB, self.DB_NUMBER, 0, data)
             
-            print("✅ PLC Communication: Lights OFF signal sent.")
             plc_client.disconnect()
         except Exception as e:
             print(f"❌ PLC Communication: Failed to connect to PLC. Error: {e}")
@@ -419,7 +512,6 @@ class WelVisionApp(tk.Tk):
                 process.join()
         
         self.processes = []
-        print("✅ Inspection stopped.")
     
     def on_nav_change(self, button_id):
         """
@@ -428,7 +520,6 @@ class WelVisionApp(tk.Tk):
         Args:
             button_id: ID of the clicked navigation button
         """
-        print(f"Navigation changed to: {button_id}")
         self.show_tab(button_id)
     
     def show_tab(self, tab_id):
@@ -438,6 +529,21 @@ class WelVisionApp(tk.Tk):
         Args:
             tab_id: ID of the tab to show
         """
+        # Store reference to previous settings tab if it exists and has active preview
+        previous_settings_tab = None
+        if hasattr(self, 'settings_tab') and self.settings_tab is not None:
+            if hasattr(self.settings_tab, 'preview_active') and self.settings_tab.preview_active:
+                # Keep reference to preserve state
+                previous_settings_tab = self.settings_tab
+                print("📌 Settings tab has active preview - preserving state")
+            elif tab_id != "settings":
+                # Cleanup settings tab when navigating away (no active preview)
+                try:
+                    if hasattr(self.settings_tab, 'cleanup'):
+                        self.settings_tab.cleanup()
+                except:
+                    pass
+        
         # Clear current tab content
         if self.current_tab_frame:
             self.current_tab_frame.destroy()
@@ -461,8 +567,15 @@ class WelVisionApp(tk.Tk):
             self._show_placeholder_tab("Diagnosis Tab", "System diagnosis and troubleshooting")
         
         elif tab_id == "settings":
-            self.settings_tab = SettingsTab(self.current_tab_frame, self)
-            self.settings_tab.setup()
+            # If we have a previous settings tab with active preview, restore it
+            if previous_settings_tab is not None:
+                self.settings_tab = previous_settings_tab
+                self.settings_tab.parent = self.current_tab_frame
+                self.settings_tab.setup()
+            else:
+                # Create fresh settings tab instance
+                self.settings_tab = SettingsTab(self.current_tab_frame, self)
+                self.settings_tab.setup()
         
         elif tab_id == "model_management":
             self.model_management_tab = ModelManagementTab(self.current_tab_frame, self)
@@ -620,11 +733,27 @@ class WelVisionApp(tk.Tk):
     
     def on_closing(self):
         """Handle application closing."""
+        # Check if settings preview is active
+        if hasattr(self, 'settings_tab') and self.settings_tab:
+            if hasattr(self.settings_tab, 'preview_active') and self.settings_tab.preview_active:
+                from tkinter import messagebox
+                response = messagebox.askyesno(
+                    "Preview Active",
+                    "Settings preview is currently running.\n\n"
+                    "Closing the application will stop the preview.\n\n"
+                    "Do you want to close anyway?"
+                )
+                if not response:
+                    return  
+        
         print("Closing application...")
         self.camera_running = False
         
         if self.inspection_running:
             self.stop_inspection()
         
+        delete_all_pycache(".")
+        clear_gpu_memory()
+
         time.sleep(0.5)
         self.destroy()

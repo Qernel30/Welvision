@@ -101,7 +101,6 @@ def trigger_plc_action(plc_client, db_number, byte_index, bool_index, action):
 
 def capture_frames_bigface(shared_frame_bigface, frame_lock_bigface,frame_shape):
     """Continuously capture frames from the camera."""
-    print("Starting frame capture...")
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 960)
@@ -137,11 +136,10 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
     roller_dict = {}
     previous_head_status = False
      
-    model_bf_path = r".\models\BF_sr.pt"
     model_head_path = r".\models\BF_head.pt"
 
     try: 
-        model_bf = YOLO(model_bf_path)
+        model_bf = YOLO(model_bigface_path)
         model_head = YOLO(model_head_path)
         if torch.cuda.is_available():
             model_bf.to("cuda")
@@ -398,7 +396,6 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
 def handle_slot_control_bigface(roller_queue_bigface,shared_data,command_queue):
     """Control slot mechanism based on second proximity sensor."""
     global roller_number
-    print("Starting slot control...")
 
     a = False
     while True:
@@ -432,7 +429,7 @@ def capture_frames_od(shared_frame_od, frame_lock_od,frame_shape):
             print("Failed to capture frame.")
             time.sleep(0.01)
 
-def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_lock, shared_data, frame_shape, roller_updation_dict,shared_annotated_od, annotated_frame_lock_od):
+def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_path, queue_lock, shared_data, frame_shape, roller_updation_dict,shared_annotated_od, annotated_frame_lock_od):
     """Process frames for YOLO inference and track roller defects with pulse debounce & proper exit handling."""
 
     detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\OD\\Defect"
@@ -459,9 +456,9 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, queue_loc
                 return idx
         return 0
 
-    od_model_path = r".\models\OD_sr.pt"
+
     od_conf = shared_data.get('od_conf_threshold', 0.25)
-    od_model = YOLO(od_model_path).to("cuda")
+    od_model = YOLO(model_od_path).to("cuda")
     print("OD Model loaded in GPU")
 
     warmup_frame = r"Warmup OD.jpg"

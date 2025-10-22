@@ -124,7 +124,7 @@ class ControlPanel:
                 if response:
                     try:
                         # Get employee ID (use current user email or ID)
-                        employee_id = self.app.current_user if self.app.current_user else "Unknown"
+                        employee_id = self.app.current_user if self.app.current_user is not None else "Unknown"
                         
                         # Get start time (or use current time if not set)
                         start_time = self.app.inspection_start_time if hasattr(self.app, 'inspection_start_time') and self.app.inspection_start_time else None
@@ -189,36 +189,27 @@ class ControlPanel:
         status = "enabled" if self.allow_images_var.get() else "disabled"
         print(f"Allow all images: {status}")
         
-        # Update shared_data if available (will be used when inspection starts)
         if hasattr(self.app, 'shared_data') and self.app.shared_data is not None:
             self.app.shared_data['allow_all'] = self.allow_images_var.get()
             print(f"✅ Updated shared_data['allow_all'] = {self.allow_images_var.get()}")
     
     def _restore_inspection_state(self):
         """Restore button states if inspection is running."""
-        # Check if inspection is currently running
         if hasattr(self.app, 'inspection_running') and self.app.inspection_running:
-            # Apply inspection state to control panel buttons (without re-disabling tabs)
             self.state_manager.restore_control_panel_state(self)
     
     def _on_start_inspection(self):
         """Handle start button click and monitor system readiness."""
-        # Set the allow_all flag in shared_data before starting inspection
         if hasattr(self.app, 'shared_data') and self.app.shared_data is not None:
             self.app.shared_data['allow_all'] = self.allow_images_var.get()
-            print(f"🚀 Starting inspection with allow_all = {self.allow_images_var.get()}")
         
-        # Disable the allow_images checkbox during inspection
         if self.allow_images_checkbox:
             self.allow_images_checkbox.config(state=tk.DISABLED)
         
-        # Apply all UI state changes for inspection start
         self.state_manager.on_inspection_start(self)
         
-        # Start the inspection process
         self.app.start_inspection()
         
-        # Start monitoring for system readiness
         self._check_system_ready()
     
     def _check_system_ready(self):

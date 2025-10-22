@@ -1,0 +1,92 @@
+"""
+Preview Control Panel Component for Settings Tab
+Contains Start/Stop Preview buttons
+"""
+
+import tkinter as tk
+from ..utils.styles import Colors, Fonts
+
+
+class PreviewControlPanel:
+    """Control panel for camera preview operations in settings."""
+    
+    def __init__(self, parent, settings_tab_instance):
+        """
+        Initialize the preview control panel.
+        
+        Args:
+            parent: Parent frame
+            settings_tab_instance: Reference to settings tab instance
+        """
+        self.parent = parent
+        self.settings_tab = settings_tab_instance
+        self.start_button = None
+        self.stop_button = None
+        self.control_frame = None
+        
+    def setup(self):
+        """Setup the preview control panel UI."""
+        # Control buttons frame
+        self.control_frame = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
+        self.control_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        # Start Preview button
+        self.start_button = tk.Button(
+            self.control_frame,
+            text="▶ Start Preview",
+            font=Fonts.TEXT_BOLD,
+            bg=Colors.SUCCESS,
+            fg=Colors.WHITE,
+            disabledforeground=Colors.WHITE,
+            width=20,
+            height=2,
+            command=self._on_start_preview
+        )
+        self.start_button.pack(side=tk.LEFT, padx=10, pady=5)
+        
+        # Stop Preview button
+        self.stop_button = tk.Button(
+            self.control_frame,
+            text="⏹ Stop Preview",
+            font=Fonts.TEXT_BOLD,
+            bg="#6c757d",  # Gray
+            fg=Colors.WHITE,
+            disabledforeground=Colors.WHITE,
+            width=20,
+            height=2,
+            command=self._on_stop_preview,
+            state=tk.DISABLED
+        )
+        self.stop_button.pack(side=tk.LEFT, padx=10, pady=5)
+        
+        return self.control_frame
+    
+    def _on_start_preview(self):
+        """Handle start preview button click."""
+        # Delegate to settings tab
+        self.settings_tab.start_preview()
+        
+        # Update button states
+        self.enable_stop()
+    
+    def _on_stop_preview(self):
+        """Handle stop preview button click."""
+        # Delegate to settings tab
+        self.settings_tab.stop_preview()
+        
+        # Update button states
+        self.enable_start()
+    
+    def enable_start(self):
+        """Enable the start button and disable stop button."""
+        if self.start_button:
+            self.start_button.config(state=tk.NORMAL, bg=Colors.SUCCESS)
+        if self.stop_button:
+            self.stop_button.config(state=tk.DISABLED, bg="#6c757d")
+    
+    def enable_stop(self):
+        """Enable the stop button and disable start button."""
+        if self.start_button:
+            self.start_button.config(state=tk.DISABLED, bg="#6c757d")
+        if self.stop_button:
+            self.stop_button.config(state=tk.NORMAL, bg=Colors.DANGER)
