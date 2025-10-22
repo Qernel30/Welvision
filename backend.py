@@ -10,6 +10,211 @@ from ultralytics import YOLO
 import torch
 from datetime import datetime
 
+def get_thresholds_for_model(model_name_path, model_type='bf'):
+    """
+    Get thresholds from database in the format required by filter_detections.
+    
+    Args:
+        model_name_path: Path of the model (e.g., 'Small_BF', 'Small_OD')
+        model_type: 'bf' or 'od'
+    
+    Returns:
+        dict: Dictionary with class names as keys and threshold percentages as values
+              Example: {'rust': 80, 'dent': 90, 'damage': 75}
+              Returns empty dict {} if no thresholds found (will use 50% default in filter)
+    """
+    try:
+        import mysql.connector
+        
+        connection = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="root",
+            database="welvision_db"
+        )
+        cursor = connection.cursor()
+        
+        # Select the correct table
+        table_name = 'bf_threshold_history' if model_type == 'bf' else 'od_threshold_history'
+        
+        # Get the Model name from model path
+        query_model = f"SELECT model_name FROM {'bf_models' if model_type == 'bf' else 'od_models'} WHERE model_path = %s"
+        cursor.execute(query_model, (model_name_path,))
+        model_name_result = cursor.fetchone()
+        model_name = model_name_result[0] if model_name_result else None
+
+        if model_name:
+            # Get the latest threshold entry for this model
+            query = f"""
+                SELECT defect_threshold 
+                FROM {table_name} 
+                WHERE model_name = %s 
+                ORDER BY change_timestamp DESC 
+                LIMIT 1
+            """
+            
+            cursor.execute(query, (model_name,))
+            result = cursor.fetchone()
+            
+            cursor.close()
+            connection.close()
+            
+            if result and result[0]:
+                defect_threshold_str = result[0]
+                
+                thresholds = {}
+                
+                pairs = defect_threshold_str.split(', ')
+                for pair in pairs:
+                    if ':' in pair:
+                        defect_name, threshold_str = pair.split(':')
+                        threshold_value = int(threshold_str.strip().rstrip('%'))
+                        thresholds[defect_name.strip()] = threshold_value
+                
+                return thresholds
+            else:
+                return {}
+        else:
+            return {}
+            
+    except Exception as e:
+        print(f"❌ Error loading thresholds from DB: {e}")
+        import traceback
+        traceback.print_exc()
+        return {} 
+
+
+def get_model_confidence_threshold(model_name_path, model_type='bf'):
+    """
+    Get the model confidence threshold from database.
+    
+    Args:
+        model_name_path: Name of the model
+        model_type: 'bf' or 'od'
+    
+    Returns:
+        float: Model confidence threshold as decimal (e.g., 0.25 for 25%)
+               Returns 0.25 (25%) as default if not found
+    """
+    try:
+        import mysql.connector
+        
+        connection = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="root",
+            database="welvision_db"
+        )
+        cursor = connection.cursor()
+        
+        table_name = 'bf_threshold_history' if model_type == 'bf' else 'od_threshold_history'
+        
+        # Get the Model name from model path
+        query_model = f"SELECT model_name FROM {'bf_models' if model_type == 'bf' else 'od_models'} WHERE model_path = %s"
+        cursor.execute(query_model, (model_name_path,))
+        model_name_result = cursor.fetchone()
+        model_name = model_name_result[0] if model_name_result else None
+
+        if model_name:
+            query = f"""
+                SELECT model_threshold 
+                FROM {table_name} 
+                WHERE model_name = %s 
+                ORDER BY change_timestamp DESC 
+                LIMIT 1
+            """
+            
+            cursor.execute(query, (model_name,))
+            result = cursor.fetchone()
+            
+            cursor.close()
+            connection.close()
+            
+            if result:
+                model_conf = float(result[0])
+                return model_conf
+            else:
+                return 0.25
+        else:
+            return 0.25
+            
+    except Exception as e:
+        print(f"❌ Error loading model confidence from DB: {e}")
+        return 0.25
+    
+def annotate_detections(image, detections):
+    """
+    Draws bounding boxes and labels on the image using different colors per class.
+
+    Args:
+        image: Input image (numpy array).
+        detections: list of tuples - (label, x1, y1, x2, y2, class_id, confidence)
+
+    Returns:
+        Annotated image (same shape as input).
+    """
+    COLORS = [
+        (255, 255, 255),  # White
+        (0, 255, 255),    # Cyan
+        (0, 255, 0),      # Bright Green
+        (255, 255, 0),    # Yellow
+        (255, 0, 255),    # Magenta
+        (255, 128, 0),    # Orange
+        (128, 255, 255),  # Light Cyan
+        (255, 204, 229),  # Light Pink
+    ]
+
+
+    font_scale = 0.7
+    font_thickness = 2
+
+    for det in detections:
+        label, x1, y1, x2, y2, class_id, conf = det
+
+        # Pick color by class_id
+        color = COLORS[class_id % len(COLORS)]
+
+        # Draw bounding box
+        cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
+
+        # Prepare label text
+        text = f"{label} {conf:.2f}"
+        (text_width, text_height), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness)
+
+        # Draw background rectangle for text
+        cv2.rectangle(image, (int(x1), int(y1) - text_height - 6),
+                             (int(x1) + text_width + 2, int(y1)),
+                             color, -1)
+
+        # Put label text
+        cv2.putText(image, text, (int(x1), int(y1) - 2),
+                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), font_thickness)
+
+    return image
+
+
+def filter_detections(detections, thresholds):
+    """
+    SIMPLIFIED: Filter detections using aligned thresholds
+    
+    detections: list of tuples - (label, x1, y1, x2, y2, class_id, confidence)
+    class_names: list of class names indexed by class ID (not used since labels are already correct)
+    thresholds: dict with class name as key and threshold as value (already aligned with model class names)
+    """
+    filtered = []
+    
+    for det in detections:
+        label = det[0]  # Detection label
+        conf = det[6]   # Detection confidence
+        
+        # Direct threshold lookup since names are already aligned
+        threshold_value = thresholds.get(label, 50)  # Default to 50% if not found
+        threshold = threshold_value / 100.0  # Convert percentage to decimal
+        if conf >= threshold:
+            filtered.append(det)
+
+    return filtered
+
 def plc_communication(plc_ip, rack, slot, db_number, shared_data, command_queue):
     """
     Handles all PLC communication: reading sensor statuses and executing commands.
@@ -132,6 +337,7 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
     os.makedirs(allow_all_folder_bf, exist_ok=True)
     allow_all_folder_head = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\BF\\All_Head"
     os.makedirs(allow_all_folder_head, exist_ok=True)
+    
     bf_triggered = False
     roller_dict = {}
     previous_head_status = False
@@ -152,6 +358,11 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
         
     class_names = model_bf.names
     roller_class_index = 5
+    
+    # Load thresholds from database
+    defect_thresholds = get_thresholds_for_model(model_bigface_path, 'bf')
+    model_conf_threshold = get_model_confidence_threshold(model_bigface_path, 'bf')
+    
 
     warmup_frame = r"Warmup BF.jpg"
     try:
@@ -191,10 +402,8 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
 
     roller_id_counter = 0
     previous_bf_state = False
-    frame_number = 0
     latest_min = 180
     latest_max = 240
-    frame_number_head = 0
     
     shared_data["bf_inspected"] = 0
     shared_data["bf_ok_rollers"] = 0
@@ -207,6 +416,7 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
     shared_data["bf_others"] = 0
 
     allow_all = shared_data.get("allow_all", False)    
+    
     while True:
         
         current_bf_state = shared_data["bigface_presence"]
@@ -289,23 +499,25 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
             # pc = proximity_count_bigface.value
 
 
-            results = model_bf.predict(frame, device=0, conf=.5, verbose=False, half=True, agnostic_nms=True)
+            results = model_bf.predict(frame, device=0, conf=model_conf_threshold, verbose=False, half=True, agnostic_nms=True)
 
             if roller_class_index is None:
                 return
             
 
-            detections_for_filter = []
+            detections = []
             if results and results[0].boxes.data is not None:
                 for box in results[0].boxes.data:
                     x1, y1, x2, y2, conf, cls = box 
                     cls = int(cls)
                     label = "roller" if cls == roller_class_index else class_names[cls]
-                    detections_for_filter.append((label, int(x1), int(y1), int(x2), int(y2), cls, float(conf)))
+                    detections.append((label, int(x1), int(y1), int(x2), int(y2), cls, float(conf)))
 
-            filtered_detections = detections_for_filter
+            filtered_detections = filter_detections(detections, defect_thresholds)
             detections = sorted(filtered_detections, key=lambda x: x[1])  # Sort by x-coordinate
-            annotated_frame = results[0].plot()
+            annotated_frame = frame.copy()
+            annotated_frame = annotate_detections(annotated_frame, filtered_detections)
+        
             
             # Check for roller and defect detections
             has_roller_detection = any(detection[0] == "roller" for detection in detections)
@@ -470,7 +682,6 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
     except Exception as e:
         print(f"Error during YOLO inference on warmup image: {e}")
 
-    frame_number = 0  
     roller_dict = {}  
     previous_od_state = False
     od_triggered = False
@@ -488,6 +699,11 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
     shared_data["od_others"] = 0
 
     allow_all = shared_data.get("allow_all", False)
+
+    # Load thresholds from database
+    defect_thresholds = get_thresholds_for_model(model_od_path, 'od')
+    model_conf_threshold = get_model_confidence_threshold(model_od_path, 'od')
+    
     while True:
         current_od_state = shared_data["od_presence"]
 
@@ -505,14 +721,24 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
             with frame_lock_od:
                 np_frame = np.frombuffer(shared_frame_od.get_obj(), dtype=np.uint8).reshape(frame_shape)
 
-            results = od_model.predict(np_frame, device=0, conf=od_conf, verbose=False, half=True, agnostic_nms=True)
-            detections = [
-                ("roller" if int(box[-1]) == 5 else "defect", int(box[0]), int(box[1]), int(box[2]), int(box[3]), int(box[-1]) , float(box[-2]) )
-                for box in results[0].boxes.data
-            ] if results and results[0].boxes.data is not None else []
-            
-            detections = sorted(detections, key=lambda x: x[1])  # Sort by x-coordinate
-            annotated_frame = results[0].plot()
+            results = od_model.predict(np_frame, device=0, conf=model_conf_threshold, verbose=False, half=True, agnostic_nms=True)
+            detections = []
+            if results and len(results) > 0:
+                boxes = results[0].boxes
+                if boxes is not None:
+                    for box in boxes:
+                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                        conf = float(box.conf[0])
+                        class_id = int(box.cls[0])
+                        label = od_model.names[class_id]
+                        
+                        detections.append((label, x1, y1, x2, y2, class_id, conf))
+
+            filtered_detections = filter_detections(detections, defect_thresholds)
+            detections = sorted(filtered_detections, key=lambda x: x[1])  # Sort by x-coordinate
+            annotated_frame = np_frame.copy()
+            annotated_frame = annotate_detections(annotated_frame, filtered_detections)
+        
 
             # Check for roller and defect detections
             has_roller_detection = any(detection[0] == "roller" for detection in detections)
