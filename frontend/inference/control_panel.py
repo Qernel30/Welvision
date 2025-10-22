@@ -103,7 +103,6 @@ class ControlPanel:
     
     def _reset_results(self):
         """Reset all inspection results and save to database."""
-        print("Resetting results...")
         
         # Check if there's data to save
         if hasattr(self.app, 'shared_data') and self.app.shared_data:

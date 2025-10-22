@@ -99,9 +99,6 @@ class RollerDatabase:
             cursor.execute(insert_query, data)
             self.connection.commit()
             
-            print(f"✅ BF tracking data inserted successfully")
-            print(f"   Inspected: {total_inspected}, Accepted: {total_accepted}, Rejected: {total_rejected}")
-            
             cursor.close()
             return True
             
@@ -160,9 +157,6 @@ class RollerDatabase:
             
             cursor.execute(insert_query, data)
             self.connection.commit()
-            
-            print(f"✅ OD tracking data inserted successfully")
-            print(f"   Inspected: {total_inspected}, Accepted: {total_accepted}, Rejected: {total_rejected}")
             
             cursor.close()
             return True

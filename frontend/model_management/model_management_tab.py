@@ -45,6 +45,20 @@ class ModelManagementTab:
         )
         title_label.pack(pady=(0, 20))
         
+        # Company footer in top right (below logout button area)
+        company_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
+        company_frame.place(relx=1.0, y=10, anchor=tk.NE)
+        
+        company_label = tk.Label(
+            company_frame,
+            text="Developed and Maintained by\n© Welvision Pvt Limited",
+            font=Fonts.TEXT_BOLD,
+            fg="#FFFFFF",
+            bg=Colors.PRIMARY_BG,
+            justify=tk.RIGHT
+        )
+        company_label.pack(padx=20)
+        
         # Upload section
         self.upload_section = UploadSection(main_container, self)
         self.upload_section.create()

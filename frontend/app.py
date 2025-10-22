@@ -20,6 +20,7 @@ from .inference import InferenceTab
 from .statistics import StatisticsTab
 from .settings import SettingsTab
 from .model_management import ModelManagementTab
+from .diagnosis import DiagnosisTab
 from backend import (
     plc_communication,
     capture_frames_bigface,
@@ -109,6 +110,7 @@ class WelVisionApp(tk.Tk):
         self.statistics_tab = None
         self.settings_tab = None
         self.model_management_tab = None
+        self.diagnosis_tab = None
         
         # Content frame reference
         self.content_frame = None
@@ -564,7 +566,8 @@ class WelVisionApp(tk.Tk):
             self._show_placeholder_tab("Data Tab", "Data management and viewing functionality")
         
         elif tab_id == "diagnosis":
-            self._show_placeholder_tab("Diagnosis Tab", "System diagnosis and troubleshooting")
+            self.diagnosis_tab = DiagnosisTab(self.current_tab_frame, self)
+            self.diagnosis_tab.setup()
         
         elif tab_id == "settings":
             # If we have a previous settings tab with active preview, restore it
