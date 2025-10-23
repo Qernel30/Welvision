@@ -4,6 +4,7 @@ Displays roller type, date/time, machine mode, disc status, confidence threshold
 """
 
 import tkinter as tk
+import tkinter.ttk as ttk
 from datetime import datetime
 from ..utils.styles import Colors, Fonts
 
@@ -60,19 +61,95 @@ class StatusPanel:
         return frame
     
     def _create_roller_type_section(self, parent, column):
-        """Create roller type section."""
-        frame = self._create_section_frame(parent, "Roller Type", column)
+        """Create roller type section with dropdown."""
+        frame = self._create_section_frame(parent, "Roller Data", column)
+        
+        # Get roller types from database
+        roller_types = self._get_roller_types()
         
         self.status_vars['roller_type'] = tk.StringVar(value="")
-        label = tk.Label(
+        
+        # Create dropdown for roller selection
+        self.roller_dropdown = ttk.Combobox(
             frame,
             textvariable=self.status_vars['roller_type'],
-            font=Fonts.TEXT_BOLD,
-            fg=Colors.WHITE,
-            bg=Colors.PRIMARY_BG,
-            height=1
+            values=roller_types,
+            state="readonly",
+            font=Fonts.TEXT,
+            width=15
         )
-        label.pack(padx=8, pady=8, fill=tk.BOTH, expand=True)
+        self.roller_dropdown.pack(padx=8, pady=8, fill=tk.X)
+        
+        # Bind selection event
+        self.roller_dropdown.bind("<<ComboboxSelected>>", self._on_roller_selected)
+        
+        # Set default selection if available
+        if roller_types:
+            self.roller_dropdown.set(roller_types[0])
+            self._load_roller_info(roller_types[0])
+    
+    def _get_roller_types(self):
+        """Get list of roller types from database."""
+        try:
+            import mysql.connector
+            
+            connection = mysql.connector.connect(
+                host='localhost',
+                user='root',
+                password='root',
+                database='welvision_db'
+            )
+            
+            cursor = connection.cursor()
+            cursor.execute("SELECT roller_type FROM roller_data ORDER BY roller_type")
+            
+            roller_types = [row[0] for row in cursor.fetchall()]
+            
+            cursor.close()
+            connection.close()
+            
+            return roller_types if roller_types else ["No Rollers"]
+        
+        except Exception as e:
+            print(f"❌ Error fetching roller types: {e}")
+            return ["No Rollers"]
+    
+    def _on_roller_selected(self, event=None):
+        """Handle roller selection from dropdown."""
+        selected_roller = self.status_vars['roller_type'].get()
+        if selected_roller and selected_roller != "No Rollers":
+            self._load_roller_info(selected_roller)
+    
+    def _load_roller_info(self, roller_type):
+        """Load and display roller information in the roller info panel."""
+        try:
+            # Update roller info panel via inference tab
+            if hasattr(self.app, 'inference_tab') and self.app.inference_tab:
+                if hasattr(self.app.inference_tab, 'results_panel') and self.app.inference_tab.results_panel:
+                    # Use the load_roller_from_db method in results_panel
+                    self.app.inference_tab.results_panel.load_roller_from_db(roller_type)
+        
+        except Exception as e:
+            print(f"❌ Error loading roller info: {e}")
+    
+    def refresh_roller_list(self):
+        """Refresh the roller dropdown list from database."""
+        roller_types = self._get_roller_types()
+        
+        current_selection = self.status_vars['roller_type'].get()
+        
+        self.roller_dropdown['values'] = roller_types
+        
+        # Restore selection if it still exists, otherwise select first
+        if current_selection in roller_types:
+            self.roller_dropdown.set(current_selection)
+            # Reload the roller info to get updated values
+            self._load_roller_info(current_selection)
+        elif roller_types:
+            self.roller_dropdown.set(roller_types[0])
+            self._load_roller_info(roller_types[0])
+        else:
+            self.roller_dropdown.set("No Rollers")
     
     def _create_datetime_section(self, parent, column):
         """Create date & time section."""

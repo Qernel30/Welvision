@@ -164,5 +164,11 @@ class InferenceTab:
             if self.status_panel:
                 self.status_panel.update_model_names()
         
+        # Refresh roller list if data was updated (check flag)
+        if hasattr(self.app, 'roller_data_updated') and self.app.roller_data_updated:
+            if self.status_panel and hasattr(self.status_panel, 'refresh_roller_list'):
+                self.status_panel.refresh_roller_list()
+            self.app.roller_data_updated = False
+        
         # Continue monitoring every 500ms
         self.parent.after(500, self._monitor_status_updates)

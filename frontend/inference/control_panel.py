@@ -181,7 +181,6 @@ class ControlPanel:
         self.app.bf_defective = 0
         self.app.bf_good = 0
         
-        print("✅ All statistics reset successfully")
     
     def _toggle_allow_images(self):
         """Toggle allow all images setting."""
@@ -201,6 +200,17 @@ class ControlPanel:
         """Handle start button click and monitor system readiness."""
         if hasattr(self.app, 'shared_data') and self.app.shared_data is not None:
             self.app.shared_data['allow_all'] = self.allow_images_var.get()
+            
+            # Store selected roller type in shared_data
+            if hasattr(self.app, 'inference_tab') and self.app.inference_tab:
+                if hasattr(self.app.inference_tab, 'status_panel') and self.app.inference_tab.status_panel:
+                    selected_roller = self.app.inference_tab.status_panel.status_vars.get('roller_type')
+                    if selected_roller:
+                        roller_type = selected_roller.get()
+                        if roller_type and roller_type != "No Rollers":
+                            self.app.shared_data['selected_roller_type'] = roller_type
+                        else:
+                            self.app.shared_data['selected_roller_type'] = None
         
         if self.allow_images_checkbox:
             self.allow_images_checkbox.config(state=tk.DISABLED)

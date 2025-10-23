@@ -68,7 +68,7 @@ class RollerDatabase:
             end_time = datetime.now().time()
             
             # Prepare data
-            roller_type = "Small"  # Hardcoded as per requirement
+            roller_type = roller_type = shared_data.get("selected_roller_type", "Small")
             total_inspected = shared_data.get("bf_inspected", 0)
             total_accepted = shared_data.get("bf_ok_rollers", 0)
             total_rejected = shared_data.get("bf_not_ok_rollers", 0)
@@ -127,7 +127,7 @@ class RollerDatabase:
             end_time = datetime.now().time()
             
             # Prepare data
-            roller_type = "Small"  # Hardcoded as per requirement
+            roller_type = roller_type = shared_data.get("selected_roller_type", "Small")
             total_inspected = shared_data.get("od_inspected", 0)
             total_accepted = shared_data.get("od_ok_rollers", 0)
             total_rejected = shared_data.get("od_not_ok_rollers", 0)

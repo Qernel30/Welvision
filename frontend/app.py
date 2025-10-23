@@ -22,6 +22,7 @@ from .settings import SettingsTab
 from .model_management import ModelManagementTab
 from .diagnosis import DiagnosisTab
 from .system_check import SystemCheckTab
+from .data import DataTab
 from backend import (
     plc_communication,
     capture_frames_bigface,
@@ -87,6 +88,9 @@ class WelVisionApp(tk.Tk):
         self.inspection_running = False
         self.camera_running = False
         
+        # Roller data update flag (for inference page refresh)
+        self.roller_data_updated = False
+        
         # Defect thresholds
         self.od_defect_thresholds = AppConfig.OD_DEFECT_THRESHOLDS.copy()
         self.bf_defect_thresholds = AppConfig.BF_DEFECT_THRESHOLDS.copy()
@@ -113,6 +117,7 @@ class WelVisionApp(tk.Tk):
         self.model_management_tab = None
         self.diagnosis_tab = None
         self.system_check_tab = None
+        self.data_tab = None
         
         # Content frame reference
         self.content_frame = None
@@ -576,7 +581,8 @@ class WelVisionApp(tk.Tk):
                 self.start_camera_feeds()
         
         elif tab_id == "data":
-            self._show_placeholder_tab("Data Tab", "Data management and viewing functionality")
+            self.data_tab = DataTab(self.current_tab_frame, self)
+            self.data_tab.setup()
         
         elif tab_id == "diagnosis":
             self.diagnosis_tab = DiagnosisTab(self.current_tab_frame, self)

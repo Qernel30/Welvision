@@ -126,17 +126,20 @@ class ResultsPanel:
         left_col = tk.Frame(inner_frame, bg=Colors.PRIMARY_BG)
         left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
         
-        self._create_info_row(left_col, "Outer Diameter :", "outer_diameter", "25 mm")
-        self._create_info_row(left_col, "Dimple Diameter:", "dimple_diameter", "20 mm")
-        self._create_info_row(left_col, "Small Diameter :", "small_diameter", "15 mm")
+        self._create_info_row(left_col, "Outer Diameter :", "outer_diameter", "No Data")
+        self._create_info_row(left_col, "Dimple Diameter:", "dimple_diameter", "No Data")
+        self._create_info_row(left_col, "Small Diameter :", "small_diameter", "No Data")
         
         # Right column
         right_col = tk.Frame(inner_frame, bg=Colors.PRIMARY_BG)
         right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
         
-        self._create_info_row(right_col, "Roller Length :", "roller_length", "40.25 mm")
-        self._create_info_row(right_col, "High Head (pixels):", "high_head", "0 pixels")
-        self._create_info_row(right_col, "Down Head (pixels):", "down_head", "0 pixels")
+        self._create_info_row(right_col, "Roller Length :", "roller_length", "No Data")
+        self._create_info_row(right_col, "High Head (pixels):", "high_head", "No Data")
+        self._create_info_row(right_col, "Down Head (pixels):", "down_head", "No Data")
+        
+        # Load initial data from database
+        self._load_initial_roller_info()
     
     def _create_info_row(self, parent, label_text, var_key, default_value):
         """Create a single roller info row."""
@@ -196,6 +199,97 @@ class ResultsPanel:
         for key, value in kwargs.items():
             if key in self.result_vars:
                 self.result_vars[key].set(value)
+    
+    def _load_initial_roller_info(self):
+        """Load initial roller data from database."""
+        try:
+            import mysql.connector
+            
+            connection = mysql.connector.connect(
+                host='localhost',
+                user='root',
+                password='root',
+                database='welvision_db'
+            )
+            
+            cursor = connection.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT outer_diameter, dimple_diameter, small_diameter, 
+                       length_mm, high_head_pixels, down_head_pixels
+                FROM roller_data
+                ORDER BY roller_type
+                LIMIT 1
+            """)
+            result = cursor.fetchone()
+            
+            cursor.close()
+            connection.close()
+            
+            if result:
+                self.update_roller_info(
+                    outer_diameter=f"{result['outer_diameter']} mm",
+                    dimple_diameter=f"{result['dimple_diameter']} mm",
+                    small_diameter=f"{result['small_diameter']} mm",
+                    roller_length=f"{result['length_mm']} mm",
+                    high_head=f"{result['high_head_pixels']} pixels",
+                    down_head=f"{result['down_head_pixels']} pixels"
+                )
+        
+        except Exception as e:
+            print(f"❌ Error loading initial roller info: {e}")
+    
+    def load_roller_from_db(self, roller_type):
+        """
+        Load roller information from database by roller type.
+        
+        Args:
+            roller_type: Name of the roller type to load
+        """
+        try:
+            import mysql.connector
+            
+            connection = mysql.connector.connect(
+                host='localhost',
+                user='root',
+                password='root',
+                database='welvision_db'
+            )
+            
+            cursor = connection.cursor(dictionary=True)
+            query = """
+                SELECT outer_diameter, dimple_diameter, small_diameter, 
+                       length_mm, high_head_pixels, down_head_pixels
+                FROM roller_data
+                WHERE roller_type = %s
+            """
+            cursor.execute(query, (roller_type,))
+            result = cursor.fetchone()
+            
+            cursor.close()
+            connection.close()
+            
+            if result:
+                self.update_roller_info(
+                    outer_diameter=f"{result['outer_diameter']} mm",
+                    dimple_diameter=f"{result['dimple_diameter']} mm",
+                    small_diameter=f"{result['small_diameter']} mm",
+                    roller_length=f"{result['length_mm']} mm",
+                    high_head=f"{result['high_head_pixels']} pixels",
+                    down_head=f"{result['down_head_pixels']} pixels"
+                )
+            else:
+                # Set to "No Data" if not found
+                self.update_roller_info(
+                    outer_diameter="No Data",
+                    dimple_diameter="No Data",
+                    small_diameter="No Data",
+                    roller_length="No Data",
+                    high_head="No Data",
+                    down_head="No Data"
+                )
+        
+        except Exception as e:
+            print(f"❌ Error loading roller from database: {e}")
     
     def update_from_shared_data(self, shared_data):
         """

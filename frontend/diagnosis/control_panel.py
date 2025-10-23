@@ -114,15 +114,22 @@ class ControlPanel:
         )
         component_type_label.pack(anchor=tk.W, pady=(0, 2))
         
+        # Get roller types from database
+        roller_types = self._get_roller_types()
+        
         component_type_combo = ttk.Combobox(
             right_column,
             textvariable=self.component_type_var,
-            values=["Small"],
+            values=roller_types,
             state="readonly",
             font=Fonts.SMALL,
             width=12
         )
         component_type_combo.pack(fill=tk.X, pady=(0, 8))
+        
+        # Set default value
+        if roller_types:
+            self.component_type_var.set(roller_types[0])
         
         # To Date (Right) - Calendar Widget
         to_date_label = tk.Label(
@@ -185,6 +192,32 @@ class ControlPanel:
                 
         except Exception as e:
             print(f"Error validating to date: {e}")
+    
+    def _get_roller_types(self):
+        """Get list of roller types from database."""
+        try:
+            import mysql.connector
+            
+            connection = mysql.connector.connect(
+                host='localhost',
+                user='root',
+                password='root',
+                database='welvision_db'
+            )
+            
+            cursor = connection.cursor()
+            cursor.execute("SELECT roller_type FROM roller_data ORDER BY roller_type")
+            
+            roller_types = [row[0] for row in cursor.fetchall()]
+            
+            cursor.close()
+            connection.close()
+            
+            return roller_types if roller_types else ["Small"]
+        
+        except Exception as e:
+            print(f"❌ Error fetching roller types: {e}")
+            return ["Small"]
     
     def get_filters(self):
         """

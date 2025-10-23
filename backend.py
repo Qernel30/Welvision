@@ -141,7 +141,51 @@ def get_model_confidence_threshold(model_name_path, model_type='bf'):
     except Exception as e:
         print(f"❌ Error loading model confidence from DB: {e}")
         return 0.25
+
+def get_roller_head_limits(roller_type):
+    """
+    Get high head and down head pixel limits from database for a specific roller type.
     
+    Args:
+        roller_type: Name of the roller type (e.g., "Small", "Medium", "Large")
+    
+    Returns:
+        tuple: (high_head_pixels, down_head_pixels) or (180, 240) as default
+    """
+    try:
+        import mysql.connector
+        
+        connection = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="root",
+            database="welvision_db"
+        )
+        cursor = connection.cursor()
+        
+        query = """
+            SELECT high_head_pixels, down_head_pixels 
+            FROM roller_data 
+            WHERE roller_type = %s
+        """
+        
+        cursor.execute(query, (roller_type,))
+        result = cursor.fetchone()
+        
+        cursor.close()
+        connection.close()
+        
+        if result:
+            high_head = result[0] if result[0] is not None else 180
+            down_head = result[1] if result[1] is not None else 240
+            return high_head, down_head
+        else:
+            return 180, 240
+            
+    except Exception as e:
+        print(f"❌ Error loading head limits from DB: {e}")
+        return 180, 240
+
 def annotate_detections(image, detections):
     """
     Draws bounding boxes and labels on the image using different colors per class.
@@ -402,8 +446,16 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
 
     roller_id_counter = 0
     previous_bf_state = False
-    latest_min = 180
-    latest_max = 240
+
+    # Get selected roller type from shared_data
+    selected_roller_type = shared_data.get('selected_roller_type', None)
+    
+    # Load head limits from database based on selected roller type
+    if selected_roller_type:
+        latest_min, latest_max = get_roller_head_limits(selected_roller_type)
+    else:
+        latest_min, latest_max = 180, 240
+
     
     shared_data["bf_inspected"] = 0
     shared_data["bf_ok_rollers"] = 0

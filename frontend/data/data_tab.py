@@ -1,0 +1,92 @@
+"""
+Data Tab - Main Controller
+Handles roller data management and global limits configuration
+"""
+
+import tkinter as tk
+from ..utils.styles import Colors, Fonts
+from .global_limits_panel import GlobalLimitsPanel
+from .roller_info_panel import RollerInfoPanel
+from .roller_data_table import RollerDataTable
+
+
+class DataTab:
+    """Data Management tab for roller configuration."""
+    
+    def __init__(self, parent, app_instance):
+        """
+        Initialize the data tab.
+        
+        Args:
+            parent: Parent frame (tab)
+            app_instance: Reference to main WelVisionApp instance
+        """
+        self.parent = parent
+        self.app = app_instance
+        
+        # Components
+        self.global_limits_panel = None
+        self.roller_info_panel = None
+        self.roller_data_table = None
+        
+    def setup(self):
+        """Setup the data tab UI."""
+        # Main container
+        main_container = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
+        
+        # Header frame for title and company info
+        header_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
+        header_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Title (centered)
+        title_label = tk.Label(
+            header_frame,
+            text="Roller Data Management",
+            font=("Arial", 20, "bold"),
+            fg=Colors.WHITE,
+            bg=Colors.PRIMARY_BG
+        )
+        title_label.pack()
+        
+        # Company footer in top right (below logout button area)
+        company_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
+        company_frame.place(relx=1.0, y=10, anchor=tk.NE)
+        
+        company_label = tk.Label(
+            company_frame,
+            text="Developed and Maintained by\n© Welvision Pvt Limited",
+            font=Fonts.TEXT_BOLD,
+            fg="#FFFFFF",
+            bg=Colors.PRIMARY_BG,
+            justify=tk.RIGHT
+        )
+        company_label.pack(padx=20)
+        
+        # Global Roller Limits Section (Super Admin Only)
+        self.global_limits_panel = GlobalLimitsPanel(main_container, self.app)
+        self.global_limits_panel.create()
+        
+        # Roller Information Section
+        self.roller_info_panel = RollerInfoPanel(main_container, self.app)
+        self.roller_info_panel.create()
+        
+        # Roller Data Table Section
+        self.roller_data_table = RollerDataTable(main_container, self.app)
+        self.roller_data_table.create()
+        
+        # Load initial data
+        self.refresh_data()
+    
+    def refresh_data(self):
+        """Refresh all data from database."""
+        if self.global_limits_panel:
+            self.global_limits_panel.load_current_limits()
+        if self.roller_data_table:
+            self.roller_data_table.load_roller_data()
+    
+    def get_global_limits(self):
+        """Get current global limits from panel."""
+        if self.global_limits_panel:
+            return self.global_limits_panel.get_current_limits()
+        return None
