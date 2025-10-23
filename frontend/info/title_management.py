@@ -6,6 +6,7 @@ Allows SuperAdmin to change the application title
 import tkinter as tk
 from tkinter import messagebox
 from ..utils.styles import Colors, Fonts
+from ..utils.permissions import Permissions
 from .info_database import InfoDatabase
 
 
@@ -30,10 +31,20 @@ class TitleManagement:
     
     def create(self):
         """Create the title management UI."""
+        # Get user role
+        user_role = getattr(self.app, 'current_role', 'Operator')
+        
+        # Check if user can change title
+        can_change_title = Permissions.can_change_gui_title(user_role)
+        
+        # Only show this section if user is Super Admin
+        if not can_change_title:
+            return  # Don't create the UI for non-Super Admin users
+        
         # Main frame with border
         main_frame = tk.LabelFrame(
             self.parent,
-            text="🔧 GUI Application Title Management",
+            text="🔧 GUI Application Title Management (Super Admin Only)",
             font=Fonts.HEADER,
             fg="#FFA500",  # Orange
             bg=Colors.PRIMARY_BG,

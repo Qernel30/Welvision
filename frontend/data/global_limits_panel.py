@@ -6,6 +6,7 @@ Super Admin only section for setting machine-wide roller limits
 import tkinter as tk
 from tkinter import messagebox
 from ..utils.styles import Colors, Fonts
+from ..utils.permissions import Permissions
 from .data_database import DataDatabase
 
 
@@ -30,13 +31,16 @@ class GlobalLimitsPanel:
         
     def create(self):
         """Create the global limits panel UI."""
-        # Check if user is Super Admin
-        is_super_admin = (hasattr(self.app, 'current_role') and 
-                         self.app.current_role and 
-                         self.app.current_role.lower() == 'super admin')
+        # Get user role
+        user_role = getattr(self.app, 'current_role', 'Operator')
+        
+        # Check if user can modify limits (write access)
+        can_modify = Permissions.can_modify_global_roller_limits(user_role)
         
         # Main frame with collapsible header
-        title_text = "🌐 Global Roller Limits (Super Admin Only)" if is_super_admin else "🌐 Global Roller Limits"
+        access_text = "(Read-Write)" if can_modify else "(Read-Only)"
+        title_text = f"🌐 Global Roller Limits {access_text}"
+        
         main_frame = tk.LabelFrame(
             self.parent,
             text=title_text,
@@ -52,11 +56,12 @@ class GlobalLimitsPanel:
         desc_frame = tk.Frame(main_frame, bg=Colors.PRIMARY_BG)
         desc_frame.pack(fill=tk.X, padx=15, pady=(10, 5))
         
+        access_msg = "Set minimum and maximum limits for ALL roller types to ensure quality standards" if can_modify else "View minimum and maximum limits for ALL roller types"
         desc_label = tk.Label(
             desc_frame,
-            text="Set minimum and maximum limits for ALL roller types to ensure quality standards",
+            text=access_msg,
             font=Fonts.TEXT,
-            fg="#FFC107",
+            fg="#FFC107" if can_modify else "#17A2B8",
             bg=Colors.PRIMARY_BG
         )
         desc_label.pack()
@@ -127,7 +132,8 @@ class GlobalLimitsPanel:
                 font=Fonts.TEXT,
                 bg=Colors.WHITE,
                 fg="#000000",
-                insertbackground="#000000"
+                insertbackground="#000000",
+                state='normal' if can_modify else 'readonly'
             )
             entry.pack(fill=tk.X)
             
@@ -141,11 +147,18 @@ class GlobalLimitsPanel:
         warning_frame = tk.Frame(main_frame, bg=Colors.PRIMARY_BG)
         warning_frame.pack(fill=tk.X, padx=15, pady=(5, 10))
         
+        if can_modify:
+            warning_text = "⚠ These limits will apply to ALL roller types. Admin users cannot create rollers outside these ranges."
+            warning_color = "#FF6B6B"
+        else:
+            warning_text = "ℹ You have read-only access to these limits. Only Super Admin can modify them."
+            warning_color = "#17A2B8"
+        
         warning_label = tk.Label(
             warning_frame,
-            text="⚠ These limits will apply to ALL roller types. Admin users cannot create rollers outside these ranges.",
+            text=warning_text,
             font=Fonts.SMALL,
-            fg="#FF6B6B",
+            fg=warning_color,
             bg=Colors.PRIMARY_BG
         )
         warning_label.pack()
@@ -154,20 +167,21 @@ class GlobalLimitsPanel:
         button_frame = tk.Frame(main_frame, bg=Colors.PRIMARY_BG)
         button_frame.pack(fill=tk.X, padx=15, pady=(0, 15))
         
-        # Save Machine range button (available to all users)
-        save_btn = tk.Button(
-            button_frame,
-            text="💾 Save Machine range",
-            font=Fonts.TEXT_BOLD,
-            bg="#28A745",
-            fg=Colors.WHITE,
-            command=self.save_machine_range,
-            cursor="hand2",
-            relief=tk.FLAT,
-            padx=20,
-            pady=8
-        )
-        save_btn.pack(side=tk.LEFT, padx=5)
+        # Save Machine range button (only for Super Admin)
+        if can_modify:
+            save_btn = tk.Button(
+                button_frame,
+                text="💾 Save Machine range",
+                font=Fonts.TEXT_BOLD,
+                bg="#28A745",
+                fg=Colors.WHITE,
+                command=self.save_machine_range,
+                cursor="hand2",
+                relief=tk.FLAT,
+                padx=20,
+                pady=8
+            )
+            save_btn.pack(side=tk.LEFT, padx=5)
         
         # Load Current button (available to all users)
         load_btn = tk.Button(
@@ -184,20 +198,21 @@ class GlobalLimitsPanel:
         )
         load_btn.pack(side=tk.LEFT, padx=5)
         
-        # Clear Fields button (available to all users)
-        clear_btn = tk.Button(
-            button_frame,
-            text="🗑 Clear Fields",
-            font=Fonts.TEXT_BOLD,
-            bg="#6C757D",
-            fg=Colors.WHITE,
-            command=self.clear_fields,
-            cursor="hand2",
-            relief=tk.FLAT,
-            padx=20,
-            pady=8
-        )
-        clear_btn.pack(side=tk.LEFT, padx=5)
+        # Clear Fields button (only for Super Admin)
+        if can_modify:
+            clear_btn = tk.Button(
+                button_frame,
+                text="🗑 Clear Fields",
+                font=Fonts.TEXT_BOLD,
+                bg="#6C757D",
+                fg=Colors.WHITE,
+                command=self.clear_fields,
+                cursor="hand2",
+                relief=tk.FLAT,
+                padx=20,
+                pady=8
+            )
+            clear_btn.pack(side=tk.LEFT, padx=5)
     
     def save_machine_range(self):
         """Save machine range to database."""

@@ -324,7 +324,7 @@ class WelVisionApp(tk.Tk):
         )
         
         # Create navigation bar
-        self.navbar_manager = NavBarManager(main_frame, self.on_nav_change)
+        self.navbar_manager = NavBarManager(main_frame, self.on_nav_change, self)
         self.navbar_manager.create()
         
         # Create content frame for tabs

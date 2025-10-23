@@ -5,6 +5,7 @@ Handles user CRUD operations and UI coordination
 
 import tkinter as tk
 from ..utils.styles import Colors, Fonts
+from ..utils.permissions import Permissions
 from .users_table import UsersTable
 from .user_details_panel import UserDetailsPanel
 from .user_actions import UserActions
@@ -125,6 +126,33 @@ class UserManagementTab:
         # Get form data
         data = self.user_details_panel.get_data()
         
+        # Get current user role
+        current_user_role = getattr(self.app, 'current_role', 'Operator')
+        
+        # Check if Admin is trying to add Super Admin
+        if data['role'] == "Super Admin" and not Permissions.can_manage_super_admin(current_user_role):
+            self.user_actions.show_error(
+                "Permission Denied\n\n"
+                "Admin users cannot add Super Admin accounts.\n"
+                "Only Super Admin can create other Super Admin users."
+            )
+            return
+        
+        # Check if trying to add another Super Admin
+        if data['role'] == "Super Admin":
+            # Count existing Super Admin users
+            if self.db.connect():
+                super_admin_count = self.db.count_super_admins()
+                self.db.disconnect()
+                
+                if super_admin_count >= 1:
+                    self.user_actions.show_error(
+                        "Super Admin Limit Reached\n\n"
+                        "Only one Super Admin account is allowed in the system.\n"
+                        "A Super Admin account already exists."
+                    )
+                    return
+        
         # Validate inputs
         if not data['employee_id']:
             self.user_actions.show_error("Employee ID is required")
@@ -213,6 +241,46 @@ class UserManagementTab:
             self.user_actions.show_warning("Please select a user to update")
             return
         
+        # Get current user role
+        current_user_role = getattr(self.app, 'current_role', 'Operator')
+        
+        # Get the selected user's original data to check if they're Super Admin
+        selected_user = self.users_table.get_selected_user()
+        if selected_user:
+            original_role = selected_user.get('role', '')
+            
+            # Check if Admin is trying to modify a Super Admin
+            if original_role == "Super Admin" and not Permissions.can_manage_super_admin(current_user_role):
+                self.user_actions.show_error(
+                    "Permission Denied\n\n"
+                    "Admin users cannot modify Super Admin accounts.\n"
+                    "Only Super Admin can update other Super Admin users."
+                )
+                return
+            
+            # Check if Admin is trying to change someone to Super Admin
+            if data['role'] == "Super Admin" and not Permissions.can_manage_super_admin(current_user_role):
+                self.user_actions.show_error(
+                    "Permission Denied\n\n"
+                    "Admin users cannot promote users to Super Admin.\n"
+                    "Only Super Admin can assign Super Admin role."
+                )
+                return
+            
+            # Check if trying to change to Super Admin when one already exists
+            if data['role'] == "Super Admin" and original_role != "Super Admin":
+                if self.db.connect():
+                    super_admin_count = self.db.count_super_admins()
+                    self.db.disconnect()
+                    
+                    if super_admin_count >= 1:
+                        self.user_actions.show_error(
+                            "Super Admin Limit Reached\n\n"
+                            "Only one Super Admin account is allowed in the system.\n"
+                            "A Super Admin account already exists."
+                        )
+                        return
+        
         # Validate inputs
         if not data['employee_id']:
             self.user_actions.show_error("Employee ID is required")
@@ -264,6 +332,21 @@ class UserManagementTab:
         if not data['user_id']:
             self.user_actions.show_warning("Please select a user to delete")
             return
+        
+        # Get current user role
+        current_user_role = getattr(self.app, 'current_role', 'Operator')
+        
+        # Get the selected user's data to check if they're Super Admin
+        selected_user = self.users_table.get_selected_user()
+        if selected_user and selected_user.get('role') == "Super Admin":
+            # Check if Admin is trying to delete Super Admin
+            if not Permissions.can_manage_super_admin(current_user_role):
+                self.user_actions.show_error(
+                    "Permission Denied\n\n"
+                    "Admin users cannot delete Super Admin accounts.\n"
+                    "Only Super Admin can delete other Super Admin users."
+                )
+                return
         
         # Prevent deleting current logged-in user
         if data['email'] == self.app.current_user:

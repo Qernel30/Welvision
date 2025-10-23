@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import messagebox
 from ..utils.styles import Colors, Fonts
 from ..utils.config import AppConfig
+from ..utils.permissions import Permissions
 from database import save_to_database
 from .state_manager import InspectionStateManager
 import snap7
@@ -83,21 +84,30 @@ class ControlPanel:
         )
         self.reset_button.pack(side=tk.LEFT, padx=10, pady=5)
         
-        # Allow all images checkbox
+        # Allow all images checkbox - Only visible for Super Admin
         self.allow_images_var = tk.BooleanVar(value=False)
-        self.allow_images_checkbox = tk.Checkbutton(
-            control_frame,
-            text="Allow all images",
-            font=Fonts.TEXT,
-            fg=Colors.WHITE,
-            bg=Colors.PRIMARY_BG,
-            selectcolor=Colors.PRIMARY_BG,
-            activebackground=Colors.PRIMARY_BG,
-            activeforeground=Colors.WHITE,
-            variable=self.allow_images_var,
-            command=self._toggle_allow_images
-        )
-        self.allow_images_checkbox.pack(side=tk.LEFT, padx=30, pady=5)
+        
+        # Check if user has permission to access this feature
+        user_role = getattr(self.app, 'current_role', 'Operator')
+        can_access = Permissions.can_access_allow_all_images(user_role)
+        
+        if can_access:
+            self.allow_images_checkbox = tk.Checkbutton(
+                control_frame,
+                text="Allow all images",
+                font=Fonts.TEXT,
+                fg=Colors.WHITE,
+                bg=Colors.PRIMARY_BG,
+                selectcolor=Colors.PRIMARY_BG,
+                activebackground=Colors.PRIMARY_BG,
+                activeforeground=Colors.WHITE,
+                variable=self.allow_images_var,
+                command=self._toggle_allow_images
+            )
+            self.allow_images_checkbox.pack(side=tk.LEFT, padx=30, pady=5)
+        else:
+            # Don't show checkbox for non-Super Admin users
+            self.allow_images_checkbox = None
         
         # Apply inspection state if inspection is running
         self._restore_inspection_state()

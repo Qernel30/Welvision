@@ -10,6 +10,7 @@ from datetime import datetime, date
 import pandas as pd
 import os
 from ..utils.styles import Colors, Fonts
+from ..utils.permissions import Permissions
 from .info_database import InfoDatabase
 
 
@@ -500,7 +501,16 @@ Defect Thresholds:
             messagebox.showerror("Export Error", f"Failed to export threshold history:\n{str(e)}")
     
     def clear_history(self):
-        """Clear threshold history for selected filter type."""
+        """Clear threshold history for selected filter type (Admin and Super Admin only)."""
+        # Double-check permission
+        user_role = getattr(self.app, 'current_role', 'Operator')
+        if not Permissions.can_clear_settings_history(user_role):
+            messagebox.showerror(
+                "Permission Denied",
+                "Only Admin and Super Admin can clear settings history."
+            )
+            return
+        
         filter_type = self.filter_var.get()
         
         response = messagebox.askyesno(

@@ -6,6 +6,7 @@ Shows and edits details of selected user
 import tkinter as tk
 from tkinter import ttk
 from ..utils.styles import Colors, Fonts
+from ..utils.permissions import Permissions
 
 
 class UserDetailsPanel:
@@ -114,7 +115,7 @@ class UserDetailsPanel:
             self.email_entry = entry
     
     def _create_role_field(self, parent):
-        """Create role selection dropdown."""
+        """Create role selection dropdown with role-based filtering."""
         frame = tk.Frame(parent, bg=Colors.PRIMARY_BG)
         frame.pack(fill=tk.X, padx=10, pady=5)
         
@@ -133,10 +134,21 @@ class UserDetailsPanel:
         style = ttk.Style()
         style.configure("UserRole.TCombobox", fieldbackground=Colors.WHITE)
         
+        # Get current user's role to filter available roles
+        current_user_role = getattr(self.tab.app, 'current_role', 'Operator')
+        
+        # Determine available roles based on current user's role
+        if Permissions.can_manage_super_admin(current_user_role):
+            # Super Admin can manage all roles including Super Admin
+            available_roles = ["Admin", "Super Admin", "Operator"]
+        else:
+            # Admin can only manage Admin and Operator (not Super Admin)
+            available_roles = ["Admin", "Operator"]
+        
         self.role_combo = ttk.Combobox(
             frame,
             textvariable=self.role_var,
-            values=["Admin", "Super Admin", "Operator"],
+            values=available_roles,
             state="readonly",
             font=("Arial", 10),
             style="UserRole.TCombobox",

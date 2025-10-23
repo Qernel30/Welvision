@@ -5,6 +5,7 @@ Main controller for the navigation bar system
 
 import tkinter as tk
 from ..utils.styles import Colors
+from ..utils.permissions import Permissions
 from .nav_button import NavButton
 from .nav_config import NavConfig
 
@@ -12,7 +13,7 @@ from .nav_config import NavConfig
 class NavBarManager:
     """Manages the navigation bar and its buttons."""
     
-    def __init__(self, parent, on_nav_change):
+    def __init__(self, parent, on_nav_change, app_instance=None):
         """
         Initialize the navigation bar manager.
         
@@ -20,15 +21,17 @@ class NavBarManager:
             parent: Parent frame
             on_nav_change: Callback function when navigation changes
                           Should accept button_id as parameter
+            app_instance: Reference to main app instance for role checking
         """
         self.parent = parent
         self.on_nav_change = on_nav_change
+        self.app = app_instance
         self.navbar_frame = None
         self.buttons = {}
         self.active_button_id = None
         
     def create(self):
-        """Create the navigation bar."""
+        """Create the navigation bar with role-based access control."""
         # Create navbar container frame
         self.navbar_frame = tk.Frame(
             self.parent,
@@ -48,20 +51,52 @@ class NavBarManager:
         )
         buttons_container.pack(anchor=tk.W, padx=5)
         
-        # Create all navigation buttons
+        # Get current user role
+        user_role = getattr(self.app, 'current_role', 'Operator') if self.app else 'Operator'
+        
+        # Create navigation buttons based on role permissions
         for button_id, button_text, _ in NavConfig.get_button_configs():
-            nav_button = NavButton(
-                buttons_container,
-                button_text,
-                self._handle_nav_click,
-                button_id
-            )
-            nav_button.create()
-            nav_button.pack(side=tk.LEFT, padx=NavConfig.BUTTON_GAP)
-            
-            self.buttons[button_id] = nav_button
+            # Check if user has permission to access this tab
+            if self._can_access_tab(button_id, user_role):
+                nav_button = NavButton(
+                    buttons_container,
+                    button_text,
+                    self._handle_nav_click,
+                    button_id
+                )
+                nav_button.create()
+                nav_button.pack(side=tk.LEFT, padx=NavConfig.BUTTON_GAP)
+                
+                self.buttons[button_id] = nav_button
         
         return self.navbar_frame
+    
+    def _can_access_tab(self, tab_id, user_role):
+        """
+        Check if user can access a specific tab.
+        
+        Args:
+            tab_id: Tab identifier
+            user_role: User's role
+            
+        Returns:
+            bool: True if user can access, False otherwise
+        """
+        # Model Management - Admin and Super Admin only
+        if tab_id == "model_management":
+            return Permissions.can_access_model_management_tab(user_role)
+        
+        # User Management - Admin and Super Admin only
+        elif tab_id == "user_management":
+            return Permissions.can_access_user_management_tab(user_role)
+        
+        # System Check - Admin and Super Admin only
+        elif tab_id == "system_check":
+            return Permissions.can_access_system_check_tab(user_role)
+        
+        # All other tabs - accessible to all roles
+        else:
+            return True
     
     def _handle_nav_click(self, button_id):
         """

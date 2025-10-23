@@ -533,3 +533,28 @@ class UserDatabase:
             print(f"❌ Error searching users: {e}")
             DatabaseErrorHandler.handle_db_error(e, context="searching users")
             return []
+    
+    def count_super_admins(self):
+        """
+        Count the number of Super Admin users in the system.
+        
+        Returns:
+            int: Number of Super Admin users
+        """
+        try:
+            if not self.connection or not self.connection.is_connected():
+                self.connect()
+            
+            cursor = self.connection.cursor()
+            
+            query = "SELECT COUNT(*) FROM users WHERE role = 'Super Admin'"
+            cursor.execute(query)
+            result = cursor.fetchone()
+            cursor.close()
+            
+            return result[0] if result else 0
+            
+        except Error as e:
+            print(f"❌ Error counting Super Admin users: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="counting Super Admin users")
+            return 0
