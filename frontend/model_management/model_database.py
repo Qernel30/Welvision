@@ -6,7 +6,6 @@ Handles CRUD operations for model metadata in MySQL database
 import mysql.connector
 from mysql.connector import Error
 from datetime import datetime
-import configparser
 import os
 
 
@@ -15,23 +14,12 @@ class ModelDatabase:
     
     def __init__(self):
         """Initialize database connection parameters."""
-        # Try to read from config file
-        config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'db_config.ini')
-        
-        if os.path.exists(config_path):
-            config = configparser.ConfigParser()
-            config.read(config_path)
-            
-            self.host = config.get('database', 'host', fallback='localhost').strip('"')
-            self.user = config.get('database', 'user', fallback='root').strip('"')
-            self.password = config.get('database', 'password', fallback='root').strip('"')
-            self.database = config.get('database', 'database', fallback='welvision_db').strip('"')
-        else:
-            # Default values
-            self.host = 'localhost'
-            self.user = 'root'
-            self.password = 'root'
-            self.database = 'welvision_db'
+
+        # Default values
+        self.host = 'localhost'
+        self.user = 'root'
+        self.password = 'root'
+        self.database = 'welvision_db'
         
         self.connection = None
     

@@ -17,7 +17,7 @@ from .utils.helpers import center_window, create_header
 from .login import LoginPage
 from .navbar import NavBarManager
 from .inference import InferenceTab
-from .statistics import StatisticsTab
+from .info import InfoTab
 from .settings import SettingsTab
 from .model_management import ModelManagementTab
 from .diagnosis import DiagnosisTab
@@ -113,7 +113,7 @@ class WelVisionApp(tk.Tk):
         self.login_page = None
         self.navbar_manager = None
         self.inference_tab = None
-        self.statistics_tab = None
+        self.info_tab = None
         self.settings_tab = None
         self.model_management_tab = None
         self.diagnosis_tab = None
@@ -614,11 +614,8 @@ class WelVisionApp(tk.Tk):
             self.system_check_tab.setup()
         
         elif tab_id == "info":
-            self.statistics_tab = StatisticsTab(self.current_tab_frame, self)
-            self.statistics_tab.setup()
-        
-        elif tab_id == "config":
-            self._show_placeholder_tab("Config Tab", "System configuration and parameters")
+            self.info_tab = InfoTab(self.current_tab_frame, self)
+            self.info_tab.setup()
         
         # Update navbar active state
         if self.navbar_manager:

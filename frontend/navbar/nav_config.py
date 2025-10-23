@@ -18,7 +18,6 @@ class NavConfig:
         ("user_management", "USER MANAGEMENT", "User Management"),
         ("system_check", "SYSTEM CHECK", "System Check"),
         ("info", "INFO", "Info"),
-        ("config", "CONFIG", "Config"),
     ]
     
     # Navbar styling

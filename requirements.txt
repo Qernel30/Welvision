@@ -13,3 +13,5 @@ tkcalendar
 pywin32
 python-snap7
 pygrabber
+psutil
+gputil
