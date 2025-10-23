@@ -4,6 +4,8 @@ Displays detailed roller information on the right side
 """
 
 import tkinter as tk
+
+from frontend.utils.config import AppConfig
 from ..utils.styles import Colors, Fonts
 
 
@@ -69,10 +71,10 @@ class RollerInfoPanel:
             import mysql.connector
             
             connection = mysql.connector.connect(
-                host='localhost',
-                user='root',
-                password='root',
-                database='welvision_db'
+                host=AppConfig.DB_HOST,
+                user=AppConfig.DB_USER,
+                password=AppConfig.DB_PASSWORD,
+                database=AppConfig.DB_DATABASE
             )
             
             cursor = connection.cursor(dictionary=True)
@@ -112,10 +114,10 @@ class RollerInfoPanel:
             import mysql.connector
             
             connection = mysql.connector.connect(
-                host='localhost',
-                user='root',
-                password='root',
-                database='welvision_db'
+                host=AppConfig.DB_HOST,
+                user=AppConfig.DB_USER,
+                password=AppConfig.DB_PASSWORD,
+                database=AppConfig.DB_DATABASE
             )
             
             cursor = connection.cursor(dictionary=True)

@@ -7,6 +7,8 @@ import mysql.connector
 from mysql.connector import Error
 from datetime import datetime
 import os
+from ..utils.config import AppConfig
+from ..utils.db_error_handler import DatabaseErrorHandler
 
 
 class ModelDatabase:
@@ -15,11 +17,12 @@ class ModelDatabase:
     def __init__(self):
         """Initialize database connection parameters."""
 
-        # Default values
-        self.host = 'localhost'
-        self.user = 'root'
-        self.password = 'root'
-        self.database = 'welvision_db'
+        # Default values from AppConfig
+        self.host = AppConfig.DB_HOST
+        self.port = AppConfig.DB_PORT
+        self.user = AppConfig.DB_USER
+        self.password = AppConfig.DB_PASSWORD
+        self.database = AppConfig.DB_DATABASE
         
         self.connection = None
     
@@ -28,6 +31,7 @@ class ModelDatabase:
         try:
             self.connection = mysql.connector.connect(
                 host=self.host,
+                port=self.port,
                 user=self.user,
                 password=self.password,
                 database=self.database
@@ -36,6 +40,7 @@ class ModelDatabase:
                 return True
         except Error as e:
             print(f"❌ Error connecting to MySQL database: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="database connection")
             return False
     
     def disconnect(self):
@@ -73,7 +78,6 @@ class ModelDatabase:
             cursor.execute(insert_query, data)
             self.connection.commit()
             
-            print(f"✅ Model '{model_name}' inserted into {table}")
             cursor.close()
             return True
             
@@ -81,6 +85,7 @@ class ModelDatabase:
             print(f"❌ Error inserting model: {e}")
             import traceback
             traceback.print_exc()
+            DatabaseErrorHandler.handle_db_error(e, context="inserting model")
             return False
     
     def get_all_models(self, filter_type=None):
@@ -128,6 +133,7 @@ class ModelDatabase:
             print(f"❌ Error retrieving models: {e}")
             import traceback
             traceback.print_exc()
+            DatabaseErrorHandler.handle_db_error(e, context="retrieving models")
             return []
     
     def delete_model(self, model_id, model_type):
@@ -156,7 +162,6 @@ class ModelDatabase:
             cursor.execute(delete_query, (model_id,))
             self.connection.commit()
             
-            print(f"✅ Model with ID {model_id} deleted from {table}")
             cursor.close()
             return True
             
@@ -164,6 +169,7 @@ class ModelDatabase:
             print(f"❌ Error deleting model: {e}")
             import traceback
             traceback.print_exc()
+            DatabaseErrorHandler.handle_db_error(e, context="deleting model")
             return False
     
     def update_model_name(self, model_id, model_type, new_name):
@@ -194,7 +200,6 @@ class ModelDatabase:
             cursor.execute(update_query, (new_name, model_id))
             self.connection.commit()
             
-            print(f"✅ Model name updated to '{new_name}' in {table}")
             cursor.close()
             return True
             
@@ -202,4 +207,5 @@ class ModelDatabase:
             print(f"❌ Error updating model name: {e}")
             import traceback
             traceback.print_exc()
+            DatabaseErrorHandler.handle_db_error(e, context="updating model name")
             return False

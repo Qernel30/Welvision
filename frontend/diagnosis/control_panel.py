@@ -7,7 +7,10 @@ import tkinter as tk
 import tkinter.ttk as ttk
 from datetime import datetime, date
 from tkcalendar import DateEntry
+
+from frontend.utils.config import AppConfig
 from ..utils.styles import Colors, Fonts
+from ..utils.db_error_handler import DatabaseErrorHandler
 
 
 class ControlPanel:
@@ -195,14 +198,14 @@ class ControlPanel:
     
     def _get_roller_types(self):
         """Get list of roller types from database."""
-        try:
+        def _fetch_rollers():
             import mysql.connector
             
             connection = mysql.connector.connect(
-                host='localhost',
-                user='root',
-                password='root',
-                database='welvision_db'
+                host=AppConfig.DB_HOST,
+                user=AppConfig.DB_USER,
+                password=AppConfig.DB_PASSWORD,
+                database=AppConfig.DB_DATABASE
             )
             
             cursor = connection.cursor()
@@ -215,9 +218,13 @@ class ControlPanel:
             
             return roller_types if roller_types else ["Small"]
         
-        except Exception as e:
-            print(f"❌ Error fetching roller types: {e}")
-            return ["Small"]
+        return DatabaseErrorHandler.safe_db_operation(
+            _fetch_rollers,
+            parent_widget=self.parent,
+            context="fetching roller types",
+            default_return=["Small"],
+            show_error=True
+        )
     
     def get_filters(self):
         """

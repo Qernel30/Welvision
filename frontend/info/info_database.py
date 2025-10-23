@@ -5,25 +5,27 @@ Handles database operations for application settings, history, and system info
 
 import mysql.connector
 from datetime import datetime
+from ..utils.config import AppConfig
+from ..utils.db_error_handler import DatabaseErrorHandler
 
 
 class InfoDatabase:
     """Database handler for info tab operations."""
     
-    def __init__(self, host='localhost', user='root', password='root', database='welvision_db'):
+    def __init__(self, host=None, user=None, password=None, database=None):
         """
         Initialize database connection.
         
         Args:
-            host: MySQL server host
-            user: Database username
-            password: Database password
-            database: Database name
+            host: MySQL server host (defaults to AppConfig.DB_HOST)
+            user: Database username (defaults to AppConfig.DB_USER)
+            password: Database password (defaults to AppConfig.DB_PASSWORD)
+            database: Database name (defaults to AppConfig.DB_DATABASE)
         """
-        self.host = host
-        self.user = user
-        self.password = password
-        self.database = database
+        self.host = host or AppConfig.DB_HOST
+        self.user = user or AppConfig.DB_USER
+        self.password = password or AppConfig.DB_PASSWORD
+        self.database = database or AppConfig.DB_DATABASE
         self.connection = None
     
     def connect(self):
@@ -39,6 +41,7 @@ class InfoDatabase:
                 return True
         except Exception as e:
             print(f"❌ Error connecting to MySQL database: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="database connection")
             return False
     
     def disconnect(self):
@@ -55,7 +58,13 @@ class InfoDatabase:
         """
         try:
             if not self.connection or not self.connection.is_connected():
-                self.connect()
+                if not self.connect():
+                    # Connection failed, return default
+                    return "WELVISION"
+            
+            # Check if connection is still None after connect attempt
+            if not self.connection:
+                return "WELVISION"
             
             cursor = self.connection.cursor()
             
@@ -83,6 +92,7 @@ class InfoDatabase:
         
         except Exception as e:
             print(f"❌ Error getting app title: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="getting app title")
             return "WELVISION"
     
     def update_app_title(self, new_title, updated_by):
@@ -98,7 +108,13 @@ class InfoDatabase:
         """
         try:
             if not self.connection or not self.connection.is_connected():
-                self.connect()
+                if not self.connect():
+                    # Connection failed
+                    return False
+            
+            # Check if connection is still None after connect attempt
+            if not self.connection:
+                return False
             
             cursor = self.connection.cursor()
             
@@ -130,6 +146,7 @@ class InfoDatabase:
         
         except Exception as e:
             print(f"❌ Error updating app title: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="updating app title")
             return False
     
     def get_settings_history(self, limit=100):
@@ -144,7 +161,13 @@ class InfoDatabase:
         """
         try:
             if not self.connection or not self.connection.is_connected():
-                self.connect()
+                if not self.connect():
+                    # Connection failed
+                    return []
+            
+            # Check if connection is still None after connect attempt
+            if not self.connection:
+                return []
             
             cursor = self.connection.cursor()
             
@@ -174,6 +197,7 @@ class InfoDatabase:
         
         except Exception as e:
             print(f"❌ Error getting settings history: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="getting settings history")
             return []
     
     def add_settings_history(self, change_type, description, changed_by):
@@ -190,7 +214,13 @@ class InfoDatabase:
         """
         try:
             if not self.connection or not self.connection.is_connected():
-                self.connect()
+                if not self.connect():
+                    # Connection failed
+                    return False
+            
+            # Check if connection is still None after connect attempt
+            if not self.connection:
+                return False
             
             cursor = self.connection.cursor()
             
@@ -218,6 +248,7 @@ class InfoDatabase:
         
         except Exception as e:
             print(f"❌ Error adding settings history: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="adding settings history")
             return False
     
     def clear_settings_history(self):
@@ -229,7 +260,13 @@ class InfoDatabase:
         """
         try:
             if not self.connection or not self.connection.is_connected():
-                self.connect()
+                if not self.connect():
+                    # Connection failed
+                    return False
+            
+            # Check if connection is still None after connect attempt
+            if not self.connection:
+                return False
             
             cursor = self.connection.cursor()
             cursor.execute("DELETE FROM settings_history")
@@ -240,6 +277,7 @@ class InfoDatabase:
         
         except Exception as e:
             print(f"❌ Error clearing settings history: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="clearing settings history")
             return False
     
     def get_threshold_history(self, filter_type='Overall', from_date=None, to_date=None):
@@ -256,7 +294,13 @@ class InfoDatabase:
         """
         try:
             if not self.connection or not self.connection.is_connected():
-                self.connect()
+                if not self.connect():
+                    # Connection failed
+                    return []
+            
+            # Check if connection is still None after connect attempt
+            if not self.connection:
+                return []
             
             cursor = self.connection.cursor()
             
@@ -299,6 +343,7 @@ class InfoDatabase:
             print(f"❌ Error getting threshold history: {e}")
             import traceback
             traceback.print_exc()
+            DatabaseErrorHandler.handle_db_error(e, context="getting threshold history")
             return []
     
     def clear_threshold_history(self, filter_type='Overall'):
@@ -313,7 +358,13 @@ class InfoDatabase:
         """
         try:
             if not self.connection or not self.connection.is_connected():
-                self.connect()
+                if not self.connect():
+                    # Connection failed
+                    return False
+            
+            # Check if connection is still None after connect attempt
+            if not self.connection:
+                return False
             
             cursor = self.connection.cursor()
             
@@ -332,4 +383,5 @@ class InfoDatabase:
         
         except Exception as e:
             print(f"❌ Error clearing threshold history: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="clearing threshold history")
             return False

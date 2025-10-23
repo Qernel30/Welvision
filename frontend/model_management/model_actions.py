@@ -112,6 +112,10 @@ class ModelActions:
                     # Refresh table
                     self.tab.refresh_models()
                     self.status_label.config(text="Model deleted", fg="#00ff00")
+                    
+                    # Reload models in app and notify other tabs
+                    if hasattr(self.tab, 'app'):
+                        self.tab.app.reload_models_and_notify_tabs()
                 else:
                     messagebox.showerror("Error", "Failed to delete model from database!")
                     self.status_label.config(text="Delete failed", fg="#ff0000")

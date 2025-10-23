@@ -6,7 +6,10 @@ Displays roller type, date/time, machine mode, disc status, confidence threshold
 import tkinter as tk
 import tkinter.ttk as ttk
 from datetime import datetime
+
+from frontend.utils.config import AppConfig
 from ..utils.styles import Colors, Fonts
+from ..utils.db_error_handler import DatabaseErrorHandler
 
 
 class StatusPanel:
@@ -90,14 +93,14 @@ class StatusPanel:
     
     def _get_roller_types(self):
         """Get list of roller types from database."""
-        try:
+        def _fetch_rollers():
             import mysql.connector
             
             connection = mysql.connector.connect(
-                host='localhost',
-                user='root',
-                password='root',
-                database='welvision_db'
+                host=AppConfig.DB_HOST,
+                user=AppConfig.DB_USER,
+                password=AppConfig.DB_PASSWORD,
+                database=AppConfig.DB_DATABASE
             )
             
             cursor = connection.cursor()
@@ -110,9 +113,13 @@ class StatusPanel:
             
             return roller_types if roller_types else ["No Rollers"]
         
-        except Exception as e:
-            print(f"❌ Error fetching roller types: {e}")
-            return ["No Rollers"]
+        return DatabaseErrorHandler.safe_db_operation(
+            _fetch_rollers,
+            parent_widget=self.parent,
+            context="fetching roller types",
+            default_return=["No Rollers"],
+            show_error=True
+        )
     
     def _on_roller_selected(self, event=None):
         """Handle roller selection from dropdown."""
@@ -224,16 +231,23 @@ class StatusPanel:
             bg=Colors.PRIMARY_BG
         ).pack(side=tk.LEFT, padx=(0, 5))
         
-        self.status_vars['bf_conf'] = tk.StringVar(
-            value=f"{int(self.app.bf_conf_threshold * 100)}.0%"
-        )
-        tk.Label(
+        # Check if BF confidence threshold is available
+        if self.app.bf_conf_threshold is not None:
+            bf_conf_value = f"{int(self.app.bf_conf_threshold * 100)}.0%"
+            bf_conf_color = "#00bfff"  # Sky blue
+        else:
+            bf_conf_value = "Not Available"
+            bf_conf_color = "#ffff00"  # Yellow
+        
+        self.status_vars['bf_conf'] = tk.StringVar(value=bf_conf_value)
+        self.bf_conf_label = tk.Label(
             bf_frame,
             textvariable=self.status_vars['bf_conf'],
             font=Fonts.TEXT_BOLD,
-            fg="#00bfff",  # Sky blue
+            fg=bf_conf_color,
             bg=Colors.PRIMARY_BG
-        ).pack(side=tk.LEFT)
+        )
+        self.bf_conf_label.pack(side=tk.LEFT)
         
         # OD confidence
         od_frame = tk.Frame(inner_frame, bg=Colors.PRIMARY_BG)
@@ -247,16 +261,23 @@ class StatusPanel:
             bg=Colors.PRIMARY_BG
         ).pack(side=tk.LEFT, padx=(0, 5))
         
-        self.status_vars['od_conf'] = tk.StringVar(
-            value=f"{int(self.app.od_conf_threshold * 100)}.0%"
-        )
-        tk.Label(
+        # Check if OD confidence threshold is available
+        if self.app.od_conf_threshold is not None:
+            od_conf_value = f"{int(self.app.od_conf_threshold * 100)}.0%"
+            od_conf_color = "#00bfff"  # Sky blue
+        else:
+            od_conf_value = "Not Available"
+            od_conf_color = "#ffff00"  # Yellow
+        
+        self.status_vars['od_conf'] = tk.StringVar(value=od_conf_value)
+        self.od_conf_label = tk.Label(
             od_frame,
             textvariable=self.status_vars['od_conf'],
             font=Fonts.TEXT_BOLD,
-            fg="#00bfff",  # Sky blue
+            fg=od_conf_color,
             bg=Colors.PRIMARY_BG
-        ).pack(side=tk.LEFT)
+        )
+        self.od_conf_label.pack(side=tk.LEFT)
     
     def _create_ai_models_section(self, parent, column):
         """Create AI models section."""
@@ -277,14 +298,19 @@ class StatusPanel:
             bg=Colors.PRIMARY_BG
         ).pack(side=tk.LEFT, padx=(0, 5))
         
-        self.status_vars['bf_model'] = tk.StringVar(value=self.app.selected_bf_model_name)
-        tk.Label(
+        # Check if BF model is available
+        bf_model_name = self.app.selected_bf_model_name if self.app.selected_bf_model_name else "No Model Available"
+        bf_model_color = "#4CAF50" if self.app.selected_bf_model_path else "#ffff00"  # Green if available, Yellow if not
+        
+        self.status_vars['bf_model'] = tk.StringVar(value=bf_model_name)
+        self.bf_model_label = tk.Label(
             bf_frame,
             textvariable=self.status_vars['bf_model'],
             font=Fonts.TEXT_BOLD,
-            fg="#4CAF50",  # Green for active model
+            fg=bf_model_color,
             bg=Colors.PRIMARY_BG
-        ).pack(side=tk.LEFT)
+        )
+        self.bf_model_label.pack(side=tk.LEFT)
         
         # OD Model
         od_frame = tk.Frame(inner_frame, bg=Colors.PRIMARY_BG)
@@ -298,14 +324,19 @@ class StatusPanel:
             bg=Colors.PRIMARY_BG
         ).pack(side=tk.LEFT, padx=(0, 5))
         
-        self.status_vars['od_model'] = tk.StringVar(value=self.app.selected_od_model_name)
-        tk.Label(
+        # Check if OD model is available
+        od_model_name = self.app.selected_od_model_name if self.app.selected_od_model_name else "No Model Available"
+        od_model_color = "#4CAF50" if self.app.selected_od_model_path else "#ffff00"  # Green if available, Yellow if not
+        
+        self.status_vars['od_model'] = tk.StringVar(value=od_model_name)
+        self.od_model_label = tk.Label(
             od_frame,
             textvariable=self.status_vars['od_model'],
             font=Fonts.TEXT_BOLD,
-            fg="#4CAF50",  # Green for active model
+            fg=od_model_color,
             bg=Colors.PRIMARY_BG
-        ).pack(side=tk.LEFT)
+        )
+        self.od_model_label.pack(side=tk.LEFT)
     
     def update_disc_status(self, status, color=None):
         """Update disc status display."""
@@ -321,12 +352,48 @@ class StatusPanel:
     
     def update_confidence_thresholds(self):
         """Update confidence threshold displays."""
-        self.status_vars['bf_conf'].set(f"{int(self.app.bf_conf_threshold * 100)}.0%")
-        self.status_vars['od_conf'].set(f"{int(self.app.od_conf_threshold * 100)}.0%")
+        try:
+            # Update BF confidence
+            if self.app.bf_conf_threshold is not None:
+                self.status_vars['bf_conf'].set(f"{int(self.app.bf_conf_threshold * 100)}.0%")
+                if hasattr(self, 'bf_conf_label') and self.bf_conf_label.winfo_exists():
+                    self.bf_conf_label.config(fg="#00bfff")  # Sky blue
+            else:
+                self.status_vars['bf_conf'].set("Not Available")
+                if hasattr(self, 'bf_conf_label') and self.bf_conf_label.winfo_exists():
+                    self.bf_conf_label.config(fg="#ffff00")  # Yellow
+            
+            # Update OD confidence
+            if self.app.od_conf_threshold is not None:
+                self.status_vars['od_conf'].set(f"{int(self.app.od_conf_threshold * 100)}.0%")
+                if hasattr(self, 'od_conf_label') and self.od_conf_label.winfo_exists():
+                    self.od_conf_label.config(fg="#00bfff")  # Sky blue
+            else:
+                self.status_vars['od_conf'].set("Not Available")
+                if hasattr(self, 'od_conf_label') and self.od_conf_label.winfo_exists():
+                    self.od_conf_label.config(fg="#ffff00")  # Yellow
+        except tk.TclError as e:
+            # Widget was destroyed, ignore the error
+            print(f"⚠️ Could not update confidence thresholds: Widget no longer exists")
     
     def update_model_names(self):
         """Update AI model names from app."""
-        if hasattr(self.app, 'selected_bf_model_name'):
-            self.status_vars['bf_model'].set(self.app.selected_bf_model_name)
-        if hasattr(self.app, 'selected_od_model_name'):
-            self.status_vars['od_model'].set(self.app.selected_od_model_name)
+        try:
+            # Update BF model
+            if hasattr(self.app, 'selected_bf_model_name'):
+                bf_model_name = self.app.selected_bf_model_name if self.app.selected_bf_model_name else "No Model Available"
+                bf_model_color = "#4CAF50" if self.app.selected_bf_model_path else "#ffff00"
+                self.status_vars['bf_model'].set(bf_model_name)
+                if hasattr(self, 'bf_model_label') and self.bf_model_label.winfo_exists():
+                    self.bf_model_label.config(fg=bf_model_color)
+            
+            # Update OD model
+            if hasattr(self.app, 'selected_od_model_name'):
+                od_model_name = self.app.selected_od_model_name if self.app.selected_od_model_name else "No Model Available"
+                od_model_color = "#4CAF50" if self.app.selected_od_model_path else "#ffff00"
+                self.status_vars['od_model'].set(od_model_name)
+                if hasattr(self, 'od_model_label') and self.od_model_label.winfo_exists():
+                    self.od_model_label.config(fg=od_model_color)
+        except tk.TclError as e:
+            # Widget was destroyed, ignore the error
+            print(f"⚠️ Could not update model names: Widget no longer exists")

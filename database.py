@@ -7,12 +7,22 @@ import mysql.connector
 from mysql.connector import Error
 from datetime import datetime, date, time as dt_time
 import traceback
+from frontend.utils.config import AppConfig
 
 
 class RollerDatabase:
     """Database handler for roller inspection tracking."""
     
-    def __init__(self, host='localhost', user='root', password='root', database='welvision_db'):
+    def __init__(self):
+        """Initialize database connection parameters."""
+
+        self.host = AppConfig.DB_HOST
+        self.port = AppConfig.DB_PORT
+        self.user = AppConfig.DB_USER
+        self.password = AppConfig.DB_PASSWORD
+        self.database = AppConfig.DB_DATABASE
+        self.connection = None
+
         """
         Initialize database connection.
         
@@ -22,10 +32,11 @@ class RollerDatabase:
             password: Database password
             database: Database name
         """
-        self.host = host
-        self.user = user
-        self.password = password
-        self.database = database
+        self.host = AppConfig.DB_HOST
+        self.port = AppConfig.DB_PORT
+        self.user = AppConfig.DB_USER
+        self.password = AppConfig.DB_PASSWORD
+        self.database = AppConfig.DB_DATABASE
         self.connection = None
     
     def connect(self):
@@ -183,8 +194,8 @@ class RollerDatabase:
 
 # Convenience functions for easy import
 def save_to_database(employee_id, start_time, shared_data, 
-                     host='localhost', user='root', password='root', 
-                     database='welvision_db'):
+                     host=AppConfig.DB_HOST, user=AppConfig.DB_USER, password=AppConfig.DB_PASSWORD, 
+                     database=AppConfig.DB_DATABASE):
     """
     Save inspection data to database.
     

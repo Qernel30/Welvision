@@ -73,7 +73,8 @@ class ThresholdManager:
         )
         bf_conf_label.pack(side=tk.LEFT, padx=10)
         
-        if not hasattr(self.app, 'bf_conf_threshold'):
+        # Set default if None or not exists
+        if not hasattr(self.app, 'bf_conf_threshold') or self.app.bf_conf_threshold is None:
             self.app.bf_conf_threshold = 0.25
         self.app.bf_conf_slider_value = tk.DoubleVar(value=self.app.bf_conf_threshold * 100)
         
@@ -116,7 +117,8 @@ class ThresholdManager:
         )
         od_conf_label.pack(side=tk.LEFT, padx=10)
         
-        if not hasattr(self.app, 'od_conf_threshold'):
+        # Set default if None or not exists
+        if not hasattr(self.app, 'od_conf_threshold') or self.app.od_conf_threshold is None:
             self.app.od_conf_threshold = 0.25
         self.app.od_conf_slider_value = tk.DoubleVar(value=self.app.od_conf_threshold * 100)
         

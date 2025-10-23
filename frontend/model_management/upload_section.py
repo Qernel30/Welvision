@@ -197,7 +197,6 @@ class UploadSection:
             
             # Copy file
             shutil.copy2(source_file, dest_path)
-            print(f"✅ Model file copied to: {dest_path}")
             
             # Save to database
             db = ModelDatabase()
@@ -226,6 +225,10 @@ class UploadSection:
                     
                     # Refresh table
                     self.tab.refresh_models()
+                    
+                    # Reload models in app and notify other tabs
+                    if hasattr(self.tab, 'app'):
+                        self.tab.app.reload_models_and_notify_tabs()
                 else:
                     messagebox.showerror("Error", "Failed to save model to database!")
             else:

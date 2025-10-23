@@ -6,8 +6,11 @@ Contains start/stop/reset buttons and allow images checkbox
 import tkinter as tk
 from tkinter import messagebox
 from ..utils.styles import Colors, Fonts
+from ..utils.config import AppConfig
 from database import save_to_database
 from .state_manager import InspectionStateManager
+import snap7
+import cv2
 
 
 class ControlPanel:
@@ -196,8 +199,129 @@ class ControlPanel:
         if hasattr(self.app, 'inspection_running') and self.app.inspection_running:
             self.state_manager.restore_control_panel_state(self)
     
+    def _check_models_available(self):
+        """
+        Check if both BF and OD models are available.
+        
+        Returns:
+            tuple: (bool, str) - (success, error_message)
+        """
+        bf_model_path = getattr(self.app, 'selected_bf_model_path', None)
+        od_model_path = getattr(self.app, 'selected_od_model_path', None)
+        
+        if not bf_model_path or not od_model_path:
+            return False, "⚠️ Models Not Available\n\nBoth BF and OD models are required to start inference.\n\nPlease configure models in the Settings tab."
+        
+        return True, ""
+    
+    def _check_plc_connection(self):
+        """
+        Check PLC connection.
+        
+        Returns:
+            tuple: (bool, str) - (success, error_message)
+        """
+        try:
+            plc = snap7.client.Client()
+            plc.connect(AppConfig.PLC_IP, AppConfig.PLC_RACK, AppConfig.PLC_SLOT)
+            
+            if plc.get_connected():
+                plc.disconnect()
+                return True, ""
+            else:
+                return False, f"⚠️ PLC Not Connected\n\nCannot connect to PLC at {AppConfig.PLC_IP}\n\nPlease check PLC connection and try again."
+        
+        except Exception as e:
+            return False, f"⚠️ PLC Connection Failed\n\nError: {str(e)}\n\nPlease check PLC connection and try again."
+    
+    def _check_cameras_connected(self):
+        """
+        Check if cameras are connected.
+        
+        Returns:
+            tuple: (bool, str) - (success, error_message)
+        """
+        cameras_connected = []
+        
+        # Check camera indices 0 and 1
+        for idx in [0, 1]:
+            cap = cv2.VideoCapture(idx)
+            if cap.isOpened():
+                cameras_connected.append(idx)
+                cap.release()
+        
+        if len(cameras_connected) < 2:
+            return False, f"⚠️ Cameras Not Connected\n\nRequired: 2 cameras\nDetected: {len(cameras_connected)} camera(s)\n\nPlease connect all cameras and try again."
+        
+        return True, ""
+    
+    def _check_database_connection(self):
+        """
+        Check database connection.
+        
+        Returns:
+            tuple: (bool, str) - (success, error_message)
+        """
+        try:
+            import mysql.connector
+            
+            connection = mysql.connector.connect(
+                host=AppConfig.DB_HOST,
+                port=AppConfig.DB_PORT,
+                user=AppConfig.DB_USER,
+                password=AppConfig.DB_PASSWORD,
+                database=AppConfig.DB_DATABASE,
+                connection_timeout=5
+            )
+            
+            if connection.is_connected():
+                connection.close()
+                return True, ""
+            else:
+                return False, f"⚠️ Database Not Connected\n\nCannot connect to database at {AppConfig.DB_HOST}:{AppConfig.DB_PORT}\n\nPlease check database connection and try again."
+        
+        except Exception as e:
+            return False, f"⚠️ Database Connection Failed\n\nError: {str(e)}\n\nPlease check database connection and try again."
+    
+    def _validate_system_ready(self):
+        """
+        Validate that all prerequisites are met before starting inference.
+        
+        Returns:
+            bool: True if system is ready, False otherwise
+        """
+        # Check 1: Models available
+        models_ok, models_error = self._check_models_available()
+        if not models_ok:
+            messagebox.showerror("System Not Ready", models_error)
+            return False
+        
+        # Check 2: PLC connection
+        plc_ok, plc_error = self._check_plc_connection()
+        if not plc_ok:
+            messagebox.showerror("System Not Ready", plc_error)
+            return False
+        
+        # Check 3: Cameras connected
+        cameras_ok, cameras_error = self._check_cameras_connected()
+        if not cameras_ok:
+            messagebox.showerror("System Not Ready", cameras_error)
+            return False
+        
+        # Check 4: Database connection
+        db_ok, db_error = self._check_database_connection()
+        if not db_ok:
+            messagebox.showerror("System Not Ready", db_error)
+            return False
+        
+        return True
+    
     def _on_start_inspection(self):
         """Handle start button click and monitor system readiness."""
+        # Validate system prerequisites before starting
+        if not self._validate_system_ready():
+            return  # Exit if validation fails
+        
         if hasattr(self.app, 'shared_data') and self.app.shared_data is not None:
             self.app.shared_data['allow_all'] = self.allow_images_var.get()
             

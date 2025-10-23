@@ -7,24 +7,23 @@ import mysql.connector
 from mysql.connector import Error
 from datetime import datetime
 
+from frontend.utils.config import AppConfig
+from ..utils.db_error_handler import DatabaseErrorHandler
+
 
 class DataDatabase:
     """Database handler for roller data management."""
-    
-    def __init__(self, host='localhost', user='root', password='root', database='welvision_db'):
+
+    def __init__(self):
         """
         Initialize database connection.
-        
-        Args:
-            host: MySQL server host
-            user: Database username
-            password: Database password
-            database: Database name
         """
-        self.host = host
-        self.user = user
-        self.password = password
-        self.database = database
+        self.host = AppConfig.DB_HOST
+        self.port = AppConfig.DB_PORT
+        self.user = AppConfig.DB_USER
+        self.password = AppConfig.DB_PASSWORD
+        self.database = AppConfig.DB_DATABASE
+        self.connection = None
     
     def _get_connection(self):
         """Get a database connection."""
@@ -38,6 +37,7 @@ class DataDatabase:
             return connection
         except Error as e:
             print(f"❌ Error connecting to MySQL database: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="database connection")
             return None
     
     def save_global_limits(self, limits, updated_by):
@@ -121,6 +121,7 @@ class DataDatabase:
         
         except Error as e:
             print(f"❌ Error saving global limits: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="saving global limits")
             return False
     
     def get_global_limits(self):
@@ -156,6 +157,7 @@ class DataDatabase:
         
         except Error as e:
             print(f"❌ Error getting global limits: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="getting global limits")
             return None
     
     def create_roller(self, roller_data, created_by):
@@ -203,6 +205,7 @@ class DataDatabase:
         
         except Error as e:
             print(f"❌ Error creating roller: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="creating roller")
             return False
     
     def get_all_rollers(self):
@@ -236,6 +239,7 @@ class DataDatabase:
         
         except Error as e:
             print(f"❌ Error getting all rollers: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="getting all rollers")
             return []
     
     def update_roller(self, roller_id, roller_data):
@@ -289,6 +293,7 @@ class DataDatabase:
         
         except Error as e:
             print(f"❌ Error updating roller: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="updating roller")
             return False
     
     def delete_roller(self, roller_id):
@@ -319,6 +324,7 @@ class DataDatabase:
         
         except Error as e:
             print(f"❌ Error deleting roller: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="deleting roller")
             return False
     
     def roller_type_exists(self, roller_type, exclude_id=None):
@@ -355,4 +361,5 @@ class DataDatabase:
         
         except Error as e:
             print(f"❌ Error checking roller type existence: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="checking roller type existence")
             return False

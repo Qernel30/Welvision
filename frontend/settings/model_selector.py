@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import mysql.connector
 from ..utils.styles import Colors, Fonts
+from ..utils.config import AppConfig
 
 
 class ModelSelector:
@@ -131,10 +132,11 @@ class ModelSelector:
         try:
             # Connect to database
             connection = mysql.connector.connect(
-                host='localhost',
-                user='root',
-                password='root',
-                database='welvision_db'
+                host=AppConfig.DB_HOST,
+                port=AppConfig.DB_PORT,
+                user=AppConfig.DB_USER,
+                password=AppConfig.DB_PASSWORD,
+                database=AppConfig.DB_DATABASE
             )
             
             cursor = connection.cursor()

@@ -14,6 +14,7 @@ from snap7.type import Areas
 from .utils.styles import Colors, Fonts
 from .utils.config import AppConfig
 from .utils.helpers import center_window, create_header
+from .utils.db_error_handler import DatabaseErrorHandler
 from .login import LoginPage
 from .navbar import NavBarManager
 from .inference import InferenceTab
@@ -92,13 +93,13 @@ class WelVisionApp(tk.Tk):
         # Roller data update flag (for inference page refresh)
         self.roller_data_updated = False
         
-        # Defect thresholds
-        self.od_defect_thresholds = AppConfig.OD_DEFECT_THRESHOLDS.copy()
-        self.bf_defect_thresholds = AppConfig.BF_DEFECT_THRESHOLDS.copy()
+        # Defect thresholds (will be loaded from database)
+        self.od_defect_thresholds = None
+        self.bf_defect_thresholds = None
         
-        # Model confidence thresholds
-        self.od_conf_threshold = AppConfig.DEFAULT_OD_CONFIDENCE
-        self.bf_conf_threshold = AppConfig.DEFAULT_BF_CONFIDENCE
+        # Model confidence thresholds (will be loaded from database)
+        self.od_conf_threshold = None
+        self.bf_conf_threshold = None
         
         # Selected model paths from Settings (will be loaded from database)
         self.selected_bf_model_path = None
@@ -146,10 +147,11 @@ class WelVisionApp(tk.Tk):
             import mysql.connector
             
             connection = mysql.connector.connect(
-                host='localhost',
-                user='root',
-                password='root',
-                database='welvision_db'
+                host=AppConfig.DB_HOST,
+                port=AppConfig.DB_PORT,
+                user=AppConfig.DB_USER,
+                password=AppConfig.DB_PASSWORD,
+                database=AppConfig.DB_DATABASE
             )
             
             cursor = connection.cursor()
@@ -172,13 +174,10 @@ class WelVisionApp(tk.Tk):
                 bf_threshold_result = cursor.fetchone()
                 if bf_threshold_result:
                     self.bf_conf_threshold = float(bf_threshold_result[0])
-                else:
-                    print(f"⚠️ No threshold history for BF model '{self.selected_bf_model_name}', using default")
             else:
-                # Fallback to default if no models in database
-                self.selected_bf_model_path = AppConfig.MODEL_BF_SR
-                self.selected_bf_model_name = "Default BF Model (No DB models)"
-                print(f"⚠️ No BF models in database, using default")
+                # No models in database
+                self.selected_bf_model_path = None
+                self.selected_bf_model_name = "No Model Available"
             
             # Load latest OD model
             cursor.execute("SELECT model_name, model_path FROM od_models ORDER BY upload_date DESC LIMIT 1")
@@ -198,27 +197,63 @@ class WelVisionApp(tk.Tk):
                 od_threshold_result = cursor.fetchone()
                 if od_threshold_result:
                     self.od_conf_threshold = float(od_threshold_result[0])
-                else:
-                    print(f"⚠️ No threshold history for OD model '{self.selected_od_model_name}', using default")
             else:
-                # Fallback to default if no models in database
-                self.selected_od_model_path = AppConfig.MODEL_OD_SR
-                self.selected_od_model_name = "Default OD Model (No DB models)"
-                print(f"⚠️ No OD models in database, using default")
+                # No models in database
+                self.selected_od_model_path = None
+                self.selected_od_model_name = "No Model Available"
             
             cursor.close()
             connection.close()
             
         except Exception as e:
             print(f"❌ Error loading latest models from database: {e}")
-            # Fallback to default models on error
-            self.selected_bf_model_path = AppConfig.MODEL_BF_SR
-            self.selected_bf_model_name = "Default BF Model (DB Error)"
-            self.selected_od_model_path = AppConfig.MODEL_OD_SR
-            self.selected_od_model_name = "Default OD Model (DB Error)"
+            # No models available on error
+            self.selected_bf_model_path = None
+            self.selected_bf_model_name = "No Model Available"
+            self.selected_od_model_path = None
+            self.selected_od_model_name = "No Model Available"
+    
+    def reload_models_and_notify_tabs(self):
+        """
+        Reload models from database and notify Settings and Inference tabs.
+        Called when models are uploaded or deleted in Model Management tab.
+        """
+        
+        # Reload models from database
+        self._load_latest_models_from_db()
+        
+        # Notify Inference tab to update status panel
+        if hasattr(self, 'inference_tab') and self.inference_tab:
+            if hasattr(self.inference_tab, 'status_panel') and self.inference_tab.status_panel:
+                try:
+                    self.inference_tab.status_panel.update_model_names()
+                    self.inference_tab.status_panel.update_confidence_thresholds()
+                except Exception as e:
+                    print(f"⚠️ Could not update Inference status panel: {e}")
+        
+        # Notify Settings tab to reload
+        if hasattr(self, 'settings_tab') and self.settings_tab:
+            # Check if settings tab is currently active
+            current_tab = getattr(self, 'current_tab_id', None)
+            if current_tab == 'settings':
+                try:
+                    # Save preview state
+                    was_preview_active = getattr(self.settings_tab, 'preview_active', False)
+                    
+                    # Recreate settings tab
+                    self.settings_tab.parent = self.current_tab_frame
+                    self.settings_tab.setup()
+                    
+                except Exception as e:
+                    print(f"⚠️ Could not refresh Settings tab: {e}")
+        
+                        
     
     def show_login_page(self):
         """Display the login page."""
+        # Set current page to login (no error popups on login page)
+        DatabaseErrorHandler.set_current_page("login")
+        
         # Stop camera threads and inspection if running
         if hasattr(self, 'camera_running') and self.camera_running:
             self.camera_running = False
@@ -551,6 +586,12 @@ class WelVisionApp(tk.Tk):
         Args:
             tab_id: ID of the tab to show
         """
+        # Track current tab
+        self.current_tab_id = tab_id
+        
+        # Set current page for error handler and reset error flag
+        DatabaseErrorHandler.set_current_page(tab_id)
+        
         # Store reference to previous settings tab if it exists and has active preview
         previous_settings_tab = None
         if hasattr(self, 'settings_tab') and self.settings_tab is not None:

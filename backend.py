@@ -9,6 +9,7 @@ import os
 from ultralytics import YOLO
 import torch
 from datetime import datetime
+from frontend.utils.config import AppConfig
 
 def get_thresholds_for_model(model_name_path, model_type='bf'):
     """
@@ -27,10 +28,10 @@ def get_thresholds_for_model(model_name_path, model_type='bf'):
         import mysql.connector
         
         connection = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="root",
-            database="welvision_db"
+            host=AppConfig.DB_HOST,
+            user=AppConfig.DB_USER,
+            password=AppConfig.DB_PASSWORD,
+            database=AppConfig.DB_DATABASE
         )
         cursor = connection.cursor()
         
@@ -100,10 +101,10 @@ def get_model_confidence_threshold(model_name_path, model_type='bf'):
         import mysql.connector
         
         connection = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="root",
-            database="welvision_db"
+            host=AppConfig.DB_HOST,
+            user=AppConfig.DB_USER,
+            password=AppConfig.DB_PASSWORD,
+            database=AppConfig.DB_DATABASE
         )
         cursor = connection.cursor()
         
@@ -156,10 +157,10 @@ def get_roller_head_limits(roller_type):
         import mysql.connector
         
         connection = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="root",
-            database="welvision_db"
+            host=AppConfig.DB_HOST,
+            user=AppConfig.DB_USER,
+            password=AppConfig.DB_PASSWORD,
+            database=AppConfig.DB_DATABASE
         )
         cursor = connection.cursor()
         

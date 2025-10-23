@@ -8,12 +8,14 @@ from mysql.connector import Error
 import hashlib
 import secrets
 from datetime import datetime, timedelta
+from frontend.utils.config import AppConfig
+from ..utils.db_error_handler import DatabaseErrorHandler
 
 
 class UserDatabase:
     """Database handler for user management operations."""
-    
-    def __init__(self, host='localhost', user='root', password='root', database='welvision_db'):
+
+    def __init__(self, host=AppConfig.DB_HOST, user=AppConfig.DB_USER, password=AppConfig.DB_PASSWORD, database=AppConfig.DB_DATABASE):
         """
         Initialize database connection.
         
@@ -42,6 +44,7 @@ class UserDatabase:
                 return True
         except Error as e:
             print(f"❌ Error connecting to MySQL database: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="database connection")
             return False
         return False
     
@@ -127,6 +130,7 @@ class UserDatabase:
             
         except Error as e:
             print(f"❌ Error fetching users: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="fetching users")
             return []
     
     def get_user_by_id(self, user_id):
@@ -170,6 +174,7 @@ class UserDatabase:
             
         except Error as e:
             print(f"❌ Error fetching user: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="fetching user")
             return None
     
     def get_user_by_employee_id(self, employee_id):
@@ -203,6 +208,7 @@ class UserDatabase:
             
         except Error as e:
             print(f"❌ Error fetching user by employee_id: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="fetching user by employee ID")
             return None
     
     def add_user(self, employee_id, email, password, role, is_active=True):
@@ -253,6 +259,7 @@ class UserDatabase:
             
         except Error as e:
             print(f"❌ Error adding user: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="adding user")
             return False, f"Database error: {str(e)}"
     
     def update_user(self, user_id, employee_id, email, role, is_active):
@@ -305,6 +312,7 @@ class UserDatabase:
             
         except Error as e:
             print(f"❌ Error updating user: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="updating user")
             return False, f"Database error: {str(e)}"
     
     def delete_user(self, user_id):
@@ -336,6 +344,7 @@ class UserDatabase:
             
         except Error as e:
             print(f"❌ Error deleting user: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="deleting user")
             return False, f"Database error: {str(e)}"
     
     def change_password(self, user_id, new_password):
@@ -373,6 +382,7 @@ class UserDatabase:
             
         except Error as e:
             print(f"❌ Error changing password: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="changing password")
             return False, f"Database error: {str(e)}"
     
     def authenticate_user(self, email, password, role):
@@ -474,6 +484,7 @@ class UserDatabase:
             
         except Error as e:
             print(f"❌ Error authenticating user: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="authenticating user")
             return False, f"Database error: {str(e)}", None
     
     def search_users(self, search_term):
@@ -520,4 +531,5 @@ class UserDatabase:
             
         except Error as e:
             print(f"❌ Error searching users: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="searching users")
             return []

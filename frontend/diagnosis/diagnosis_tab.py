@@ -4,7 +4,10 @@ Date & Time-Based Report Sheet with charts and export functionality
 """
 
 import tkinter as tk
+
+from frontend.utils.config import AppConfig
 from ..utils.styles import Colors, Fonts
+from ..utils.db_error_handler import DatabaseErrorHandler
 from .report_data_table import ReportDataTable
 from .control_panel import ControlPanel
 from .action_panel import ActionPanel
@@ -248,10 +251,10 @@ class DiagnosisTab:
             from datetime import datetime
             
             connection = mysql.connector.connect(
-                host='localhost',
-                user='root',
-                password='root',
-                database='welvision_db'
+                host=AppConfig.DB_HOST,
+                user=AppConfig.DB_USER,
+                password=AppConfig.DB_PASSWORD,
+                database=AppConfig.DB_DATABASE
             )
             
             cursor = connection.cursor()
@@ -439,6 +442,7 @@ class DiagnosisTab:
             print(f"❌ Error fetching report data: {e}")
             import traceback
             traceback.print_exc()
+            DatabaseErrorHandler.handle_db_error(e, self.parent, "fetching report data")
     
     def _update_charts(self, data, report_type):
         """Update both charts with the report data based on report type."""

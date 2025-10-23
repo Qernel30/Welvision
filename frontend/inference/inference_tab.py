@@ -88,7 +88,6 @@ class InferenceTab:
 
                 # Update the camera feed
                 od_feed.update_frame(frame)
-                time.sleep(AppConfig.FRAME_UPDATE_RATE)
             except Exception as e:
                 # Handle exceptions and exit gracefully
                 print(f"OD camera thread error: {e}")
@@ -113,7 +112,6 @@ class InferenceTab:
 
                 # Update the camera feed
                 bf_feed.update_frame(frame)
-                time.sleep(AppConfig.FRAME_UPDATE_RATE)
             except Exception as e:
                 # Handle exceptions and exit gracefully
                 print(f"BF camera thread error: {e}")

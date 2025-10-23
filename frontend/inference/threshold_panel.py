@@ -40,7 +40,7 @@ class ThresholdPanel:
         od_frame = self._create_threshold_section(
             threshold_panel,
             "OD Defect Thresholds",
-            self.app.od_defect_thresholds,
+            self.app.od_defect_thresholds if self.app.od_defect_thresholds else {},
             row=0,
             column=0,
             is_od=True
@@ -50,7 +50,7 @@ class ThresholdPanel:
         bf_frame = self._create_threshold_section(
             threshold_panel,
             "BIG FACE Defect Thresholds",
-            self.app.bf_defect_thresholds,
+            self.app.bf_defect_thresholds if self.app.bf_defect_thresholds else {},
             row=0,
             column=1,
             is_od=False
@@ -103,8 +103,20 @@ class ThresholdPanel:
         canvas.create_window((0, 0), window=sliders_frame, anchor="nw")
         
         # Create sliders for each defect type
-        for idx, (defect, value) in enumerate(thresholds.items()):
-            self._create_slider(sliders_frame, defect, value, idx, is_od)
+        if thresholds:
+            for idx, (defect, value) in enumerate(thresholds.items()):
+                self._create_slider(sliders_frame, defect, value, idx, is_od)
+        else:
+            # Show message when no thresholds available
+            no_data_label = tk.Label(
+                sliders_frame,
+                text="No threshold data available",
+                font=Fonts.TEXT,
+                fg="#ffff00",  # Yellow
+                bg=Colors.PRIMARY_BG,
+                pady=20
+            )
+            no_data_label.pack()
         
         return section_frame
     

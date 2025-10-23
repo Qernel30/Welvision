@@ -4,25 +4,28 @@ Database operations for threshold history
 
 import mysql.connector
 from datetime import datetime
+from ..utils.config import AppConfig
+from ..utils.db_error_handler import DatabaseErrorHandler
 
 
 class ThresholdDatabase:
     """Handles database operations for threshold history."""
     
-    def __init__(self, host='localhost', user='root', password='root', database='welvision_db'):
+    def __init__(self, host=None, user=None, password=None, database=None):
         """
         Initialize database connection parameters.
         
         Args:
-            host: MySQL server host
-            user: Database username
-            password: Database password
-            database: Database name
+            host: MySQL server host (defaults to AppConfig.DB_HOST)
+            user: Database username (defaults to AppConfig.DB_USER)
+            password: Database password (defaults to AppConfig.DB_PASSWORD)
+            database: Database name (defaults to AppConfig.DB_DATABASE)
         """
-        self.host = host
-        self.user = user
-        self.password = password
-        self.database = database
+        self.host = host or AppConfig.DB_HOST
+        self.port = AppConfig.DB_PORT
+        self.user = user or AppConfig.DB_USER
+        self.password = password or AppConfig.DB_PASSWORD
+        self.database = database or AppConfig.DB_DATABASE
     
     def save_bf_thresholds(self, employee_id, defect_thresholds, model_confidence, model_name):
         """
@@ -40,6 +43,7 @@ class ThresholdDatabase:
         try:
             connection = mysql.connector.connect(
                 host=self.host,
+                port=self.port,
                 user=self.user,
                 password=self.password,
                 database=self.database
@@ -67,9 +71,11 @@ class ThresholdDatabase:
             
         except mysql.connector.Error as e:
             print(f"❌ Database error saving BF thresholds: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="saving BF thresholds")
             return False
         except Exception as e:
             print(f"❌ Error saving BF thresholds: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="saving BF thresholds")
             return False
     
     def save_od_thresholds(self, employee_id, defect_thresholds, model_confidence, model_name):
@@ -88,6 +94,7 @@ class ThresholdDatabase:
         try:
             connection = mysql.connector.connect(
                 host=self.host,
+                port=self.port,
                 user=self.user,
                 password=self.password,
                 database=self.database
@@ -115,7 +122,9 @@ class ThresholdDatabase:
             
         except mysql.connector.Error as e:
             print(f"❌ Database error saving OD thresholds: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="saving OD thresholds")
             return False
         except Exception as e:
             print(f"❌ Error saving OD thresholds: {e}")
+            DatabaseErrorHandler.handle_db_error(e, context="saving OD thresholds")
             return False

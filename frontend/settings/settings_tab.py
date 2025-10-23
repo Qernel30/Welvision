@@ -226,7 +226,28 @@ class SettingsTab:
                 self._load_latest_thresholds_from_db(bf_model_name, od_model_name)
                 
             else:
-                print("⚠️ No models selected yet, defect thresholds will load after model selection")
+                # Show message when no models available
+                no_model_frame = tk.LabelFrame(
+                    self.scrollable_frame,
+                    text="Defect Thresholds",
+                    font=Fonts.LABEL_BOLD,
+                    fg=Colors.WHITE,
+                    bg=Colors.PRIMARY_BG,
+                    bd=2
+                )
+                no_model_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+                
+                no_model_label = tk.Label(
+                    no_model_frame,
+                    text="⚠️ No models available\n\nPlease upload BF and OD models in Model Management tab\nto configure defect thresholds.",
+                    font=Fonts.TEXT,
+                    fg="#ffff00",  # Yellow
+                    bg=Colors.PRIMARY_BG,
+                    justify=tk.CENTER,
+                    pady=30
+                )
+                no_model_label.pack(fill=tk.BOTH, expand=True)
+                
         except Exception as e:
             print(f"⚠️ Could not load defect thresholds: {e}")
     
@@ -236,10 +257,11 @@ class SettingsTab:
             import mysql.connector
             
             connection = mysql.connector.connect(
-                host='localhost',
-                user='root',
-                password='root',
-                database='welvision_db'
+                host=AppConfig.DB_HOST,
+                port=AppConfig.DB_PORT,
+                user=AppConfig.DB_USER,
+                password=AppConfig.DB_PASSWORD,
+                database=AppConfig.DB_DATABASE
             )
             
             cursor = connection.cursor()
@@ -387,8 +409,14 @@ class SettingsTab:
         bf_model_path = selected_models['bf_model_path']
         od_model_path = selected_models['od_model_path']
         
+        # Check if models are available
         if not bf_model_path or not od_model_path:
-            messagebox.showerror("Error", "Please select both BF and OD models!")
+            messagebox.showerror(
+                "Models Not Available", 
+                "⚠️ Cannot start preview\n\n"
+                "Both BF and OD models are required.\n\n"
+                "Please upload models in the Model Management tab first."
+            )
             return
         
         # Start camera capture processes if not already running
@@ -713,7 +741,6 @@ class SettingsTab:
                 
                 # Update the camera feed with annotated frame
                 od_feed.update_frame(annotated_frame)
-                time.sleep(AppConfig.FRAME_UPDATE_RATE)
             except Exception as e:
                 # Handle exceptions and exit gracefully
                 print(f"❌ OD preview thread error: {e}")
@@ -776,7 +803,6 @@ class SettingsTab:
                 
                 # Update the camera feed with annotated frame
                 bf_feed.update_frame(annotated_frame)
-                time.sleep(AppConfig.FRAME_UPDATE_RATE)
             except Exception as e:
                 # Handle exceptions and exit gracefully
                 print(f"❌ BF preview thread error: {e}")

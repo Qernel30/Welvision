@@ -9,6 +9,7 @@ from ..utils.styles import Colors, Fonts
 from .title_management import TitleManagement
 from .settings_history import SettingsHistory
 from .system_information import SystemInformation
+from .database_config import DatabaseConfig
 from .user_manual import UserManual
 
 
@@ -30,6 +31,7 @@ class InfoTab:
         self.title_management = None
         self.settings_history = None
         self.system_information = None
+        self.database_config = None
         self.user_manual = None
         
         # Scrollable canvas and frame
@@ -123,6 +125,10 @@ class InfoTab:
         # System Information
         self.system_information = SystemInformation(self.scrollable_frame, self.app)
         self.system_information.create()
+        
+        # Database Configuration
+        self.database_config = DatabaseConfig(self.scrollable_frame, self.app)
+        self.database_config.create()
         
         # User Manual
         self.user_manual = UserManual(self.scrollable_frame, self.app)
