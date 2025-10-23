@@ -23,6 +23,7 @@ from .model_management import ModelManagementTab
 from .diagnosis import DiagnosisTab
 from .system_check import SystemCheckTab
 from .data import DataTab
+from .user_management import UserManagementTab
 from backend import (
     plc_communication,
     capture_frames_bigface,
@@ -118,6 +119,7 @@ class WelVisionApp(tk.Tk):
         self.diagnosis_tab = None
         self.system_check_tab = None
         self.data_tab = None
+        self.user_management_tab = None
         
         # Content frame reference
         self.content_frame = None
@@ -604,7 +606,8 @@ class WelVisionApp(tk.Tk):
             self.model_management_tab.setup()
         
         elif tab_id == "user_management":
-            self._show_placeholder_tab("User Management Tab", "User accounts and permissions")
+            self.user_management_tab = UserManagementTab(self.current_tab_frame, self)
+            self.user_management_tab.setup()
         
         elif tab_id == "system_check":
             self.system_check_tab = SystemCheckTab(self.current_tab_frame, self)

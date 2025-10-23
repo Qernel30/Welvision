@@ -21,11 +21,19 @@ class AuthHandler:
             role: Selected role
             
         Returns:
-            bool: True if authentication successful, False otherwise
+            tuple: (success: bool, error_message: str or None)
         """
         return authenticate_user(email, password, role)
     
     @staticmethod
-    def show_error():
-        """Display error message for failed login."""
-        messagebox.showerror("Login Failed", "Invalid email, password, or role.")
+    def show_error(error_message=None):
+        """
+        Display error message for failed login.
+        
+        Args:
+            error_message: Specific error message to display (optional)
+        """
+        if error_message is None:
+            error_message = "Invalid email, password, or role."
+        
+        messagebox.showerror("Login Failed", error_message)

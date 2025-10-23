@@ -18,7 +18,7 @@ class RoleSelector:
             parent: Parent frame to contain the role selector
         """
         self.parent = parent
-        self.role_var = tk.StringVar(value="User")
+        self.role_var = tk.StringVar(value="Operator")
         
     def create(self):
         """
@@ -37,7 +37,7 @@ class RoleSelector:
         
         # Create radio buttons
         roles = [
-            ("User", "User"),
+            ("Operator", "Operator"),
             ("Admin", "Admin"),
             ("Super Admin", "Super Admin")
         ]

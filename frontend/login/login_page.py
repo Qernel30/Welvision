@@ -98,8 +98,10 @@ class LoginPage:
         email, password = self.input_fields.get_credentials()
         role = self.role_selector.role_var.get()
         
-        # Attempt authentication
-        if AuthHandler.authenticate(email, password, role):
+        # Attempt authentication (returns tuple: success, error_message)
+        success, error_message = AuthHandler.authenticate(email, password, role)
+        
+        if success:
             # Clear the login page
             self._cleanup()
             # Call the success callback
@@ -108,8 +110,8 @@ class LoginPage:
             # Reset button state immediately for failed authentication
             if self.signin_button:
                 self.signin_button.reset_to_normal()
-            # Show error message
-            AuthHandler.show_error()
+            # Show specific error message
+            AuthHandler.show_error(error_message)
     
     def _cleanup(self):
         """Clean up login form resources."""
