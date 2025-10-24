@@ -691,125 +691,125 @@ class SettingsTab:
     def _update_od_preview(self):
         """Update OD camera preview feed with model inference."""
         od_feed = self.preview_camera_manager.get_feed('od') if self.preview_camera_manager else None
-                
-        while self.preview_active:
-            try:
-                # Check if feed still exists
-                if od_feed is None or od_feed.canvas is None:
-                    print("❌ OD feed or canvas is None")
-                    break
-                
-                # Check if model is loaded
-                if self.preview_od_model is None:
-                    print("❌ OD model is None")
-                    break
-                
-                # Get frame from shared memory
-                with self.app.frame_lock_od:
-                    np_frame = np.frombuffer(
-                        self.app.shared_frame_od.get_obj(), 
-                        dtype=np.uint8
-                    ).reshape(self.app.frame_shape)
-                    frame = np_frame.copy()
         
-                # Get real-time threshold values from sliders
-                current_od_conf = self.app.od_conf_slider_value.get() / 100.0
-                current_od_defect_thresholds = self.threshold_manager.get_od_thresholds()
+        # Keep thread running until camera manager is destroyed
+        while od_feed and od_feed.canvas and od_feed.canvas.winfo_exists():
+            try:
+                # Check if preview is active
+                if self.preview_active:
+                    # Preview is running - get frame and run inference
+                    with self.app.frame_lock_od:
+                        np_frame = np.frombuffer(
+                            self.app.shared_frame_od.get_obj(), 
+                            dtype=np.uint8
+                        ).reshape(self.app.frame_shape)
+                        frame = np_frame.copy()
+        
+                    # Get real-time threshold values from sliders
+                    current_od_conf = self.app.od_conf_slider_value.get() / 100.0
+                    current_od_defect_thresholds = self.threshold_manager.get_od_thresholds()
+                    
+                    # Double-check model is still loaded before prediction
+                    if self.preview_od_model is None:
+                        # Model unloaded - show black screen
+                        black_frame = np.zeros(self.app.frame_shape, dtype=np.uint8)
+                        od_feed.update_frame(black_frame)
+                        time.sleep(0.03)
+                        continue
+                    
+                    # Run inference with a low confidence to get all detections
+                    results = self.preview_od_model.predict(
+                        frame, 
+                        device=0 if torch.cuda.is_available() else 'cpu',
+                        conf=0.01,  # Low threshold to get all detections
+                        verbose=False,
+                        half=True if torch.cuda.is_available() else False
+                    )
+                    
+                    # Filter and draw detections based on current slider values
+                    annotated_frame = self._filter_and_draw_detections(
+                        frame, 
+                        results, 
+                        current_od_conf, 
+                        current_od_defect_thresholds,
+                        model_type='od'
+                    )
+                    od_feed.update_frame(annotated_frame)
+                else:
+                    # Preview is stopped - show black screen
+                    black_frame = np.zeros(self.app.frame_shape, dtype=np.uint8)
+                    od_feed.update_frame(black_frame)
                 
-                # Double-check model is still loaded before prediction
-                if self.preview_od_model is None:
-                    break
+                time.sleep(0.03)  # ~30 FPS
                 
-                # Run inference with a low confidence to get all detections
-                # We'll filter them manually based on our thresholds
-                results = self.preview_od_model.predict(
-                    frame, 
-                    device=0 if torch.cuda.is_available() else 'cpu',
-                    conf=0.01,  # Low threshold to get all detections
-                    verbose=False,
-                    half=True if torch.cuda.is_available() else False
-                )
-                
-                # Filter and draw detections based on current slider values
-                annotated_frame = self._filter_and_draw_detections(
-                    frame, 
-                    results, 
-                    current_od_conf, 
-                    current_od_defect_thresholds,
-                    model_type='od'
-                )
-                
-                # Update the camera feed with annotated frame
-                od_feed.update_frame(annotated_frame)
             except Exception as e:
-                # Handle exceptions and exit gracefully
                 print(f"❌ OD preview thread error: {e}")
                 import traceback
                 traceback.print_exc()
                 break
         
-    
     def _update_bf_preview(self):
         """Update Bigface camera preview feed with model inference."""
         bf_feed = self.preview_camera_manager.get_feed('bf') if self.preview_camera_manager else None
         
-        
-        while self.preview_active:
+        # Keep thread running until camera manager is destroyed
+        while bf_feed and bf_feed.canvas and bf_feed.canvas.winfo_exists():
             try:
-                # Check if feed still exists
-                if bf_feed is None or bf_feed.canvas is None:
-                    print("❌ BF feed or canvas is None")
-                    break
+                # Check if preview is active
+                if self.preview_active:
+                    # Preview is running - get frame and run inference
+                    with self.app.frame_lock_bigface:
+                        np_frame = np.frombuffer(
+                            self.app.shared_frame_bigface.get_obj(), 
+                            dtype=np.uint8
+                        ).reshape(self.app.frame_shape)
+                        frame = np_frame.copy()
+                    
+                    # Get real-time threshold values from sliders
+                    current_bf_conf = self.app.bf_conf_slider_value.get() / 100.0
+                    current_bf_defect_thresholds = self.threshold_manager.get_bf_thresholds()
+                    
+                    # Double-check model is still loaded before prediction
+                    if self.preview_bf_model is None:
+                        # Model unloaded - show black screen
+                        black_frame = np.zeros(self.app.frame_shape, dtype=np.uint8)
+                        bf_feed.update_frame(black_frame)
+                        time.sleep(0.03)
+                        continue
+                    
+                    # Run inference with a low confidence to get all detections
+                    results = self.preview_bf_model.predict(
+                        frame, 
+                        device=0 if torch.cuda.is_available() else 'cpu',
+                        conf=0.01,  # Low threshold to get all detections
+                        verbose=False,
+                        half=True if torch.cuda.is_available() else False
+                    )
+                    
+                    # Filter and draw detections based on current slider values
+                    annotated_frame = self._filter_and_draw_detections(
+                        frame, 
+                        results, 
+                        current_bf_conf, 
+                        current_bf_defect_thresholds,
+                        model_type='bf'
+                    )
+                    
+                    # Update the camera feed with annotated frame
+                    bf_feed.update_frame(annotated_frame)
+                else:
+                    # Preview is stopped - show black screen
+                    black_frame = np.zeros(self.app.frame_shape, dtype=np.uint8)
+                    bf_feed.update_frame(black_frame)
                 
-                # Check if model is loaded
-                if self.preview_bf_model is None:
-                    print("❌ BF model is None")
-                    break
+                time.sleep(0.03)  # ~30 FPS
                 
-                # Get frame from shared memory
-                with self.app.frame_lock_bigface:
-                    np_frame = np.frombuffer(
-                        self.app.shared_frame_bigface.get_obj(), 
-                        dtype=np.uint8
-                    ).reshape(self.app.frame_shape)
-                    frame = np_frame.copy()
-                
-                # Get real-time threshold values from sliders
-                current_bf_conf = self.app.bf_conf_slider_value.get() / 100.0
-                current_bf_defect_thresholds = self.threshold_manager.get_bf_thresholds()
-                
-                # Double-check model is still loaded before prediction
-                if self.preview_bf_model is None:
-                    break
-                
-                # Run inference with a low confidence to get all detections
-                # We'll filter them manually based on our thresholds
-                results = self.preview_bf_model.predict(
-                    frame, 
-                    device=0 if torch.cuda.is_available() else 'cpu',
-                    conf=0.01,  # Low threshold to get all detections
-                    verbose=False,
-                    half=True if torch.cuda.is_available() else False
-                )
-                
-                # Filter and draw detections based on current slider values
-                annotated_frame = self._filter_and_draw_detections(
-                    frame, 
-                    results, 
-                    current_bf_conf, 
-                    current_bf_defect_thresholds,
-                    model_type='bf'
-                )
-                
-                # Update the camera feed with annotated frame
-                bf_feed.update_frame(annotated_frame)
             except Exception as e:
-                # Handle exceptions and exit gracefully
                 print(f"❌ BF preview thread error: {e}")
                 import traceback
                 traceback.print_exc()
                 break
-            
+
     def _display_black_screens(self):
         """Display black screens on both camera feeds when preview is stopped."""
         # Create a black frame

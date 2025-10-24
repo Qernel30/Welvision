@@ -304,7 +304,7 @@ class ResultsPanel:
         bf_inspected = shared_data.get("bf_inspected", 0)
         bf_ok = shared_data.get("bf_ok_rollers", 0)
         bf_not_ok = shared_data.get("bf_not_ok_rollers", 0)
-        bf_percentage = (bf_not_ok / bf_inspected * 100) if bf_inspected > 0 else 0.0
+        bf_percentage = (bf_ok / bf_inspected * 100) if bf_inspected > 0 else 0.0
         
         self.result_vars["bf_inspected"].set(str(bf_inspected))
         self.result_vars["bf_ok"].set(str(bf_ok))
@@ -315,8 +315,8 @@ class ResultsPanel:
         od_inspected = shared_data.get("od_inspected", 0)
         od_ok = shared_data.get("od_ok_rollers", 0)
         od_not_ok = shared_data.get("od_not_ok_rollers", 0)
-        od_percentage = (od_not_ok / od_inspected * 100) if od_inspected > 0 else 0.0
-        
+        od_percentage = (od_ok / od_inspected * 100) if od_inspected > 0 else 0.0
+
         self.result_vars["od_inspected"].set(str(od_inspected))
         self.result_vars["od_ok"].set(str(od_ok))
         self.result_vars["od_not_ok"].set(str(od_not_ok))
@@ -326,7 +326,7 @@ class ResultsPanel:
         overall_inspected = bf_inspected
         overall_ok = od_ok
         overall_not_ok = bf_not_ok + od_not_ok
-        overall_percentage = (overall_not_ok / overall_inspected * 100) if overall_inspected > 0 else 0.0
+        overall_percentage = (overall_ok / overall_inspected * 100) if overall_inspected > 0 else 0.0
         
         self.result_vars["overall_inspected"].set(str(overall_inspected))
         self.result_vars["overall_ok"].set(str(overall_ok))

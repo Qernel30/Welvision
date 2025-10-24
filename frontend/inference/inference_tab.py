@@ -79,12 +79,26 @@ class InferenceTab:
                 if od_feed is None or od_feed.canvas is None:
                     break
                 
-                with self.app.annotated_frame_lock_od:
-                    np_frame = np.frombuffer(
-                        self.app.shared_annotated_od.get_obj(), 
-                        dtype=np.uint8
-                    ).reshape(self.app.frame_shape)
-                    frame = np_frame.copy()
+                # Check if inspection is running by checking if processes exist
+                inspection_running = (
+                    hasattr(self.app, 'processes') and 
+                    self.app.processes is not None and 
+                    len(self.app.processes) > 0 and
+                    self.app.inspection_running
+                )
+                
+                if inspection_running:
+                    # Inspection is running - show live feed from shared memory
+                    with self.app.annotated_frame_lock_od:
+                        np_frame = np.frombuffer(
+                            self.app.shared_annotated_od.get_obj(), 
+                            dtype=np.uint8
+                        ).reshape(self.app.frame_shape)
+                        frame = np_frame.copy()
+                else:
+                    # Inspection is stopped - show black screen
+                    frame = np.zeros(self.app.frame_shape, dtype=np.uint8)
+
 
                 # Update the camera feed
                 od_feed.update_frame(frame)
@@ -103,12 +117,25 @@ class InferenceTab:
                 if bf_feed is None or bf_feed.canvas is None:
                     break
                 
-                with self.app.annotated_frame_lock_bigface:
-                    np_frame = np.frombuffer(
-                        self.app.shared_annotated_bigface.get_obj(), 
-                        dtype=np.uint8
-                    ).reshape(self.app.frame_shape)
-                    frame = np_frame.copy()
+               # Check if inspection is running by checking if processes exist
+                inspection_running = (
+                    hasattr(self.app, 'processes') and 
+                    self.app.processes is not None and 
+                    len(self.app.processes) > 0 and
+                    self.app.inspection_running
+                )
+                
+                if inspection_running:
+                    # Inspection is running - show live feed from shared memory
+                    with self.app.annotated_frame_lock_bigface:
+                        np_frame = np.frombuffer(
+                            self.app.shared_annotated_bigface.get_obj(), 
+                            dtype=np.uint8
+                        ).reshape(self.app.frame_shape)
+                        frame = np_frame.copy()
+                else:
+                    # Inspection is stopped - show black screen
+                    frame = np.zeros(self.app.frame_shape, dtype=np.uint8)
 
                 # Update the camera feed
                 bf_feed.update_frame(frame)

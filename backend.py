@@ -583,10 +583,11 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
                 save_path = f"{detected_folder}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
                 cv2.imwrite(save_path, annotated_frame)
 
+            with annotated_frame_lock_bigface:
+                np_annotated = np.frombuffer(shared_annotated_bigface.get_obj(), dtype=np.uint8).reshape(frame_shape)
+                np.copyto(np_annotated, annotated_frame)
+                
             if len(detections) > 0:
-                with annotated_frame_lock_bigface:
-                    np_annotated = np.frombuffer(shared_annotated_bigface.get_obj(), dtype=np.uint8).reshape(frame_shape)
-                    np.copyto(np_annotated, annotated_frame)
 
                 roller_only_sorted = [detection for detection in detections if detection[0] == "roller" and detection[-1] > 0.80]
                 defect_only_sorted = [detection for detection in detections if detection[0] != "roller"]
@@ -804,15 +805,13 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
                 save_path = f"{detected_folder}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
                 cv2.imwrite(save_path, annotated_frame)
 
+            with annotated_frame_lock_od:
+                np_annotated = np.frombuffer(shared_annotated_od.get_obj(), dtype=np.uint8).reshape(frame_shape)
+                np.copyto(np_annotated, annotated_frame)
+
             if len(detections) > 0:
-                with annotated_frame_lock_od:
-                    np_annotated = np.frombuffer(shared_annotated_od.get_obj(), dtype=np.uint8).reshape(frame_shape)
-                    np.copyto(np_annotated, annotated_frame)
-
-                roller_only_sorted = [detection for detection in detections if detection[0] == "roller"]
-                roller_only_sorted = [detection for detection in roller_only_sorted if detection[-1] > 0.80 ]
-
-                defect_only_sorted = [detection for detection in detections if detection[0] == "defect"]
+                roller_only_sorted = [detection for detection in detections if detection[0] == "roller" and detection[-1] > 0.80]
+                defect_only_sorted = [detection for detection in detections if detection[0] != "roller"]
 
                 for detection in defect_only_sorted:
                     
