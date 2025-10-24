@@ -73,7 +73,7 @@ class InferenceTab:
         """Update OD camera feed display."""
         od_feed = self.camera_manager.get_feed('od')
         
-        while self.app.camera_running:
+        while not self.app.camera_stop_flag.is_set():
             try:
                 # Check if feed still exists
                 if od_feed is None or od_feed.canvas is None:
@@ -111,7 +111,7 @@ class InferenceTab:
         """Update Bigface camera feed display."""
         bf_feed = self.camera_manager.get_feed('bf')
         
-        while self.app.camera_running:
+        while not self.app.camera_stop_flag.is_set():
             try:
                 # Check if feed still exists
                 if bf_feed is None or bf_feed.canvas is None:
@@ -146,13 +146,22 @@ class InferenceTab:
     
     def start_camera_threads(self):
         """Start camera feed update threads."""
-        self.app.od_thread = threading.Thread(target=self.update_od_camera)
+        # Clear stop flag
+        self.app.camera_stop_flag.clear()
+        
+        self.app.od_thread = threading.Thread(target=self.update_od_camera, name="OD_Camera_Thread")
         self.app.od_thread.daemon = True
         self.app.od_thread.start()
         
-        self.app.bf_thread = threading.Thread(target=self.update_bf_camera)
+        # Register thread with process manager
+        self.app.process_manager.register_inference_thread(self.app.od_thread)
+        
+        self.app.bf_thread = threading.Thread(target=self.update_bf_camera, name="BF_Camera_Thread")
         self.app.bf_thread.daemon = True
         self.app.bf_thread.start()
+        
+        # Register thread with process manager
+        self.app.process_manager.register_inference_thread(self.app.bf_thread)
     
     def _monitor_status_updates(self):
         """Monitor shared_data for status updates and update status panel."""

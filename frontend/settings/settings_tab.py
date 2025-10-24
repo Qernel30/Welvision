@@ -17,6 +17,7 @@ from ultralytics import YOLO
 from multiprocessing import Process
 from ..utils.styles import Colors, Fonts
 from ..utils.config import AppConfig
+from ..utils.process_manager import ThreadStopFlag
 from .preview_camera_feed import PreviewCameraManager
 from .preview_control_panel import PreviewControlPanel
 from .model_selector import ModelSelector
@@ -52,6 +53,7 @@ class SettingsTab:
         self.preview_active = False
         self.preview_od_thread = None
         self.preview_bf_thread = None
+        self.preview_stop_flag = None  # Thread stop flag
         
         # Preview models (loaded when preview starts)
         self.preview_bf_model = None
@@ -419,6 +421,9 @@ class SettingsTab:
             )
             return
         
+        # Initialize stop flag
+        self.preview_stop_flag = ThreadStopFlag()
+        
         # Start camera capture processes if not already running
         if not hasattr(self.app, 'inspection_running') or not self.app.inspection_running:
             self._start_camera_capture_processes()
@@ -428,14 +433,10 @@ class SettingsTab:
             self.preview_bf_model = YOLO(bf_model_path)
             if torch.cuda.is_available():
                 self.preview_bf_model.to("cuda")
-            else:
-                print("✅ BF model loaded on CPU")
             
             self.preview_od_model = YOLO(od_model_path)
             if torch.cuda.is_available():
                 self.preview_od_model.to("cuda")
-            else:
-                print("✅ OD model loaded on CPU")
                 
         except Exception as e:
             messagebox.showerror("Model Load Error", f"Failed to load models:\n{str(e)}")
@@ -449,6 +450,7 @@ class SettingsTab:
         plc_client = snap7.client.Client()
         plc_client.connect("172.17.8.17", 0, 1)        
         data = plc_client.read_area(Areas.DB, 86, 0, 2)
+        set_bool(data, byte_index=1, bool_index=6, value=True)
         set_bool(data, byte_index=1, bool_index=7, value=True)
         plc_client.write_area(Areas.DB, 86, 0, data)
         plc_client.disconnect()
@@ -491,7 +493,6 @@ class SettingsTab:
                 return
             elif response:  # Yes - save changes
                 self.save_settings()
-                print("✅ Threshold changes saved")
             else:  # No - restore previous values
                 self._restore_threshold_snapshot()
         
@@ -499,11 +500,16 @@ class SettingsTab:
         plc_client = snap7.client.Client()
         plc_client.connect("172.17.8.17", 0, 1)        
         data = plc_client.read_area(Areas.DB, 86, 0, 2)
+        set_bool(data, byte_index=1, bool_index=6, value=False)
         set_bool(data, byte_index=1, bool_index=7, value=False)
         plc_client.write_area(Areas.DB, 86, 0, data)
         plc_client.disconnect()
         
         self.preview_active = False
+        
+        # Signal threads to stop
+        if self.preview_stop_flag:
+            self.preview_stop_flag.set()
         
         # Unblock navigation buttons
         self._unblock_navigation_buttons()
@@ -535,20 +541,22 @@ class SettingsTab:
             del self.preview_od_model
             self.preview_od_model = None
         
-        # Clear GPU cache
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        # Stop camera capture processes using process manager
+        if self.preview_bf_camera_process is not None:
+            self.app.process_manager.register_preview_process(self.preview_bf_camera_process)
         
-        # Stop camera capture processes if we started them
-        if self.preview_bf_camera_process is not None and self.preview_bf_camera_process.is_alive():
-            self.preview_bf_camera_process.terminate()
-            self.preview_bf_camera_process.join(timeout=1)
-            self.preview_bf_camera_process = None
+        if self.preview_od_camera_process is not None:
+            self.app.process_manager.register_preview_process(self.preview_od_camera_process)
         
-        if self.preview_od_camera_process is not None and self.preview_od_camera_process.is_alive():
-            self.preview_od_camera_process.terminate()
-            self.preview_od_camera_process.join(timeout=1)
-            self.preview_od_camera_process = None
+        self.app.process_manager.stop_all_preview()
+        
+        # Clear process references
+        self.preview_bf_camera_process = None
+        self.preview_od_camera_process = None
+        
+        # Clean up GPU memory
+        self.app.process_manager.cleanup_gpu_memory()
+        
     
     def _start_camera_capture_processes(self):
         """Start camera capture processes for preview mode."""
@@ -561,6 +569,9 @@ class SettingsTab:
             )
             self.preview_bf_camera_process.start()
             
+            # Register with process manager
+            self.app.process_manager.register_preview_process(self.preview_bf_camera_process)
+            
             # Start OD camera capture
             self.preview_od_camera_process = Process(
                 target=capture_frames_od,
@@ -568,6 +579,9 @@ class SettingsTab:
                 daemon=True
             )
             self.preview_od_camera_process.start()
+            
+            # Register with process manager
+            self.app.process_manager.register_preview_process(self.preview_od_camera_process)
             
             # Give cameras time to start capturing
             time.sleep(0.5)
@@ -578,15 +592,24 @@ class SettingsTab:
     
     def _start_preview_threads(self):
         """Start camera feed update threads for preview."""
+        # Clear stop flag
+        self.preview_stop_flag.clear()
+        
         # Start OD camera thread
-        self.preview_od_thread = threading.Thread(target=self._update_od_preview)
+        self.preview_od_thread = threading.Thread(target=self._update_od_preview, name="Preview_OD_Thread")
         self.preview_od_thread.daemon = True
         self.preview_od_thread.start()
         
+        # Register with process manager
+        self.app.process_manager.register_preview_thread(self.preview_od_thread)
+        
         # Start BF camera thread
-        self.preview_bf_thread = threading.Thread(target=self._update_bf_preview)
+        self.preview_bf_thread = threading.Thread(target=self._update_bf_preview, name="Preview_BF_Thread")
         self.preview_bf_thread.daemon = True
         self.preview_bf_thread.start()
+        
+        # Register with process manager
+        self.app.process_manager.register_preview_thread(self.preview_bf_thread)
     
     def _filter_and_draw_detections(self, frame, results, model_conf_threshold, defect_thresholds, model_type='od'):
         """
@@ -692,8 +715,8 @@ class SettingsTab:
         """Update OD camera preview feed with model inference."""
         od_feed = self.preview_camera_manager.get_feed('od') if self.preview_camera_manager else None
         
-        # Keep thread running until camera manager is destroyed
-        while od_feed and od_feed.canvas and od_feed.canvas.winfo_exists():
+        # Keep thread running until stop flag is set or canvas is destroyed
+        while od_feed and od_feed.canvas and od_feed.canvas.winfo_exists() and not self.preview_stop_flag.is_set():
             try:
                 # Check if preview is active
                 if self.preview_active:
@@ -752,8 +775,8 @@ class SettingsTab:
         """Update Bigface camera preview feed with model inference."""
         bf_feed = self.preview_camera_manager.get_feed('bf') if self.preview_camera_manager else None
         
-        # Keep thread running until camera manager is destroyed
-        while bf_feed and bf_feed.canvas and bf_feed.canvas.winfo_exists():
+        # Keep thread running until stop flag is set or canvas is destroyed
+        while bf_feed and bf_feed.canvas and bf_feed.canvas.winfo_exists() and not self.preview_stop_flag.is_set():
             try:
                 # Check if preview is active
                 if self.preview_active:
@@ -956,7 +979,49 @@ class SettingsTab:
         # Stop preview if active
         if self.preview_active:
             try:
-                self.stop_preview()
-            except:
-                pass
-            
+                # Set stop flag
+                if self.preview_stop_flag:
+                    self.preview_stop_flag.set()
+                
+                # Turn off preview flag
+                self.preview_active = False
+                
+                # Turn off PLC lights
+                try:
+                    plc_client = snap7.client.Client()
+                    plc_client.connect("172.17.8.17", 0, 1)        
+                    data = plc_client.read_area(Areas.DB, 86, 0, 2)
+                    set_bool(data, byte_index=1, bool_index=6, value=False)
+                    set_bool(data, byte_index=1, bool_index=7, value=False)
+                    plc_client.write_area(Areas.DB, 86, 0, data)
+                    plc_client.disconnect()
+                except:
+                    pass
+                
+                # Unload models
+                if self.preview_bf_model is not None:
+                    del self.preview_bf_model
+                    self.preview_bf_model = None
+                
+                if self.preview_od_model is not None:
+                    del self.preview_od_model
+                    self.preview_od_model = None
+                
+                # Use process manager for cleanup
+                if self.preview_bf_camera_process is not None:
+                    self.app.process_manager.register_preview_process(self.preview_bf_camera_process)
+                
+                if self.preview_od_camera_process is not None:
+                    self.app.process_manager.register_preview_process(self.preview_od_camera_process)
+                
+                self.app.process_manager.stop_all_preview()
+                
+                # Clear references
+                self.preview_bf_camera_process = None
+                self.preview_od_camera_process = None
+                
+                # Clean GPU memory
+                self.app.process_manager.cleanup_gpu_memory()
+                
+            except Exception as e:
+                print(f"⚠️ Error during preview cleanup: {e}")            

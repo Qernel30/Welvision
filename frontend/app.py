@@ -15,6 +15,7 @@ from .utils.styles import Colors, Fonts
 from .utils.config import AppConfig
 from .utils.helpers import center_window, create_header
 from .utils.db_error_handler import DatabaseErrorHandler
+from .utils.process_manager import ProcessManager, ThreadStopFlag
 from .login import LoginPage
 from .navbar import NavBarManager
 from .inference import InferenceTab
@@ -89,6 +90,10 @@ class WelVisionApp(tk.Tk):
         # Inspection status
         self.inspection_running = False
         self.camera_running = False
+        
+        # Process manager for cleanup
+        self.process_manager = ProcessManager()
+        self.camera_stop_flag = ThreadStopFlag()
         
         # Roller data update flag (for inference page refresh)
         self.roller_data_updated = False
@@ -254,11 +259,13 @@ class WelVisionApp(tk.Tk):
         # Set current page to login (no error popups on login page)
         DatabaseErrorHandler.set_current_page("login")
         
-        # Stop camera threads and inspection if running
+        # Stop camera threads if running
         if hasattr(self, 'camera_running') and self.camera_running:
             self.camera_running = False
-            time.sleep(0.2)  # Give threads time to stop
+            self.camera_stop_flag.set()  # Signal threads to stop
+            time.sleep(0.3)  # Give threads time to stop
         
+        # Stop inspection if running
         if hasattr(self, 'inspection_running') and self.inspection_running:
             self.stop_inspection()
         
@@ -450,6 +457,8 @@ class WelVisionApp(tk.Tk):
             args=(self.PLC_IP, self.RACK, self.SLOT, self.DB_NUMBER, self.shared_data, self.command_queue),
             daemon=True
         )
+        # Register PLC process
+        self.process_manager.register_plc_process(self.plc_process)
         
         self.processes = [
             Process(
@@ -506,6 +515,10 @@ class WelVisionApp(tk.Tk):
                 daemon=True
             )
         ]
+        
+        # Register all inference processes
+        for process in self.processes:
+            self.process_manager.register_inference_process(process)
     
     def start_inspection(self):
         """Start the inspection process."""
@@ -539,6 +552,7 @@ class WelVisionApp(tk.Tk):
             print("Inspection is not running.")
             return
         
+        # Turn off PLC lights
         plc_client = snap7.client.Client() 
         try:
             plc_client.connect(self.PLC_IP, self.RACK, self.SLOT)
@@ -556,20 +570,16 @@ class WelVisionApp(tk.Tk):
         if self.inference_tab and self.inference_tab.control_panel:
             self.inference_tab.control_panel.enable_start()
         
-        # Stop the PLC process if it's running
-        if self.plc_process and self.plc_process.is_alive():
-            self.plc_process.terminate()
-            self.plc_process.join()
-            self.plc_process = None
+        # Use process manager to stop all inference processes
+        self.process_manager.stop_all_inference()
         
-        # Stop and clear all subprocesses
-        for process in self.processes:
-            if process.is_alive():
-                process.terminate()
-                process.join()
+        # Clean up GPU memory
+        self.process_manager.cleanup_gpu_memory()
         
+        # Clear process references
+        self.plc_process = None
         self.processes = []
-    
+            
     def on_nav_change(self, button_id):
         """
         Handle navigation button click.
@@ -598,7 +608,6 @@ class WelVisionApp(tk.Tk):
             if hasattr(self.settings_tab, 'preview_active') and self.settings_tab.preview_active:
                 # Keep reference to preserve state
                 previous_settings_tab = self.settings_tab
-                print("📌 Settings tab has active preview - preserving state")
             elif tab_id != "settings":
                 # Cleanup settings tab when navigating away (no active preview)
                 try:
@@ -787,9 +796,7 @@ class WelVisionApp(tk.Tk):
         # Get current confidence values
         od_conf = self.od_conf_threshold
         bf_conf = self.bf_conf_threshold
-        
-        print(f"Updating model confidence: OD={od_conf:.2f}, Bigface={bf_conf:.2f}")
-        
+                
         # Update the shared data dictionary with new confidence values
         if hasattr(self, 'shared_data'):
             self.shared_data['od_conf_threshold'] = od_conf
@@ -811,13 +818,20 @@ class WelVisionApp(tk.Tk):
                     return  
         
         print("Closing application...")
+        # Stop camera threads
         self.camera_running = False
+        self.camera_stop_flag.set()
         
+        # Stop inspection if running
         if self.inspection_running:
             self.stop_inspection()
         
+        # Stop all remaining processes and threads
+        self.process_manager.stop_everything()
+        
+        # Clean up cache and GPU memory
         delete_all_pycache(".")
-        clear_gpu_memory()
+        self.process_manager.cleanup_gpu_memory()
 
         time.sleep(0.5)
         self.destroy()

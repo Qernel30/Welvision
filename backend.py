@@ -628,6 +628,8 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
                         shared_data["bf_not_ok_rollers"] += 1
                     else:
                         shared_data["bf_ok_rollers"] += 1
+                        if shared_data.get("od_inspected") is not None:
+                            shared_data["od_inspected"] += 1
 
                     unique_defects = set(defect_names)
 
@@ -767,7 +769,6 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
             roller_id_counter += 1
             
             roller_dict[roller_id_counter] = {'defect': False , 'defect_names': ["No defect"]}
-            shared_data["od_inspected"] += 1
             print(f"\n🎯 OD New roller detected! Assigned Roller ID: {roller_id_counter}")
 
         if od_triggered:
@@ -838,32 +839,33 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
                 first_key = next(iter(roller_dict))
 
                 if first_key in roller_dict:
-                    roller_data = roller_dict[first_key]
-                    defect_detected = roller_data['defect']
-                    defect_names = roller_data['defect_names']
+                    if roller_updation_dict[first_key] == 0:
+                        roller_data = roller_dict[first_key]
+                        defect_detected = roller_data['defect']
+                        defect_names = roller_data['defect_names']
 
-                    if defect_detected:
-                        shared_data["od_not_ok_rollers"] += 1
-                    else:
-                        shared_data["od_ok_rollers"] += 1
+                        if defect_detected:
+                            shared_data["od_not_ok_rollers"] += 1
+                        else:
+                            shared_data["od_ok_rollers"] += 1
 
-                    unique_defects = set(defect_names)
+                        unique_defects = set(defect_names)
 
-                    for defect_name in unique_defects:
-                        defect_lower = defect_name.lower()
-                        
-                        if defect_lower == "rust":
-                            shared_data["od_rust"] += 1
-                        elif defect_lower == "dent":
-                            shared_data["od_dent"] += 1
-                        elif defect_lower == "damage":
-                            shared_data["od_damage"] += 1
-                        elif defect_lower == "damage on end" or defect_lower == "damage_on_end":
-                            shared_data["od_damage_on_end"] += 1
-                        elif defect_lower == "spherical mark" or defect_lower == "spherical_mark":
-                            shared_data["od_spherical_mark"] += 1
-                        elif defect_lower != "no defect":
-                            shared_data["od_others"] += 1
+                        for defect_name in unique_defects:
+                            defect_lower = defect_name.lower()
+                            
+                            if defect_lower == "rust":
+                                shared_data["od_rust"] += 1
+                            elif defect_lower == "dent":
+                                shared_data["od_dent"] += 1
+                            elif defect_lower == "damage":
+                                shared_data["od_damage"] += 1
+                            elif defect_lower == "damage on end" or defect_lower == "damage_on_end":
+                                shared_data["od_damage_on_end"] += 1
+                            elif defect_lower == "spherical mark" or defect_lower == "spherical_mark":
+                                shared_data["od_spherical_mark"] += 1
+                            elif defect_lower != "no defect":
+                                shared_data["od_others"] += 1
 
 
                 roller_dict.pop(first_key) 
