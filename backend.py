@@ -10,6 +10,37 @@ from ultralytics import YOLO
 import torch
 from datetime import datetime
 from frontend.utils.config import AppConfig
+import psutil
+
+def set_priority_high():
+    p = psutil.Process(os.getpid())
+    if os.name == "nt":
+        p.nice(psutil.HIGH_PRIORITY_CLASS)
+
+def set_priority_above_normal():
+    p = psutil.Process(os.getpid())
+    if os.name == "nt":
+        p.nice(psutil.ABOVE_NORMAL_PRIORITY_CLASS)
+
+def set_priority_below_normal():
+    p = psutil.Process(os.getpid())
+    if os.name == "nt":
+        p.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+
+def configure_gpu_for_background():
+    """Configure GPU to maintain performance when app loses focus"""
+    if torch.cuda.is_available():
+        try:
+            torch.cuda.set_per_process_memory_fraction(0.99)  # Use 99% of GPU
+            
+            torch.cuda.init()
+            torch.cuda.synchronize()
+            
+            # Disable memory caching issues
+            os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
+            
+        except Exception as e:
+            print(f"⚠️ GPU configuration warning: {e}")
 
 def get_thresholds_for_model(model_name_path, model_type='bf'):
     """
@@ -264,6 +295,8 @@ def plc_communication(plc_ip, rack, slot, db_number, shared_data, command_queue)
     """
     Handles all PLC communication: reading sensor statuses and executing commands.
     """
+    set_priority_below_normal()
+
     plc_client = snap7.client.Client()
     try:
         plc_client.connect(plc_ip, rack, slot)
@@ -351,6 +384,8 @@ def trigger_plc_action(plc_client, db_number, byte_index, bool_index, action):
 
 def capture_frames_bigface(shared_frame_bigface, frame_lock_bigface,frame_shape):
     """Continuously capture frames from the camera."""
+    set_priority_above_normal()
+
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 960)
@@ -374,6 +409,8 @@ def capture_frames_bigface(shared_frame_bigface, frame_lock_bigface,frame_shape)
         
 def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_queue_bigface, model_bigface_path, proximity_count_bigface, roller_updation_dict, queue_lock, shared_data, frame_shape, shared_annotated_bigface, annotated_frame_lock_bigface):
     """Process frames for YOLO inference."""
+    set_priority_high()
+
     detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\BF\\Defect"
     os.makedirs(detected_folder, exist_ok=True)
     head_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\BF\\Head_Defect"
@@ -397,6 +434,7 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
             model_head.to("cuda")
             print("BF Model loaded in GPU")
 
+            configure_gpu_for_background()
     except:
         print("Model is not loaded exiting process")
         return
@@ -470,199 +508,205 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
 
     allow_all = shared_data.get("allow_all", False)    
     
-    while True:
+    try:
+        while True:
+            
+            current_bf_state = shared_data["bigface_presence"]
+
+            if current_bf_state and not previous_bf_state:
+                roller_id_counter += 1
+
+                bf_triggered = True
+                roller_dict[roller_id_counter] = {'defect': False , 'defect_names': ["No defect"]}
+                shared_data["bf_inspected"] += 1
+                print(f"\n🎯 BF New roller detected! Assigned Roller ID: {roller_id_counter}")
+
+            current_head_state = shared_data["head_classification"]
+
+            if current_head_state and not previous_head_status:
+
+                with frame_lock_bigface:
+                    np_frame = np.frombuffer(shared_frame_bigface.get_obj(), dtype=np.uint8).reshape(frame_shape)
+                    frame = np_frame.copy()
+
+                results = model_head.predict(frame, device=0, conf=0.7, verbose=False, half=True, agnostic_nms=True)
+
+                boxes = results[0].boxes.xyxy.cpu().numpy()  # shape: [N, 4]
+                classes = results[0].boxes.cls.cpu().numpy()  # class IDs
+
+                x1r, y1r, x2r, y2r = 0, 0, 0, 0
+                x1d, y1d, x2d, y2d = 0, 0, 0, 0 
+                for (x1,y1,x2,y2),cls in zip(boxes,classes):
+                    if cls == 0:
+                        x1d, y1d, x2d, y2d = x1, y1, x2, y2
+                    elif cls == 1:
+                        x1r, y1r, x2r, y2r = x1, y1, x2, y2
+
+
+                horizontal_distance = ( (x2r - x1r) - (x2d - x1d) )/2
+                vertical_distance = ( (y2r - y1r) - (y2d - y1d) )/2
+
+                distance_pixels = (horizontal_distance + vertical_distance)/2
+
+                if distance_pixels < latest_min:
+                    head_type = "High Head"
+                elif distance_pixels > latest_max:
+                    head_type = "Down Head"
+                else:
+                    head_type = "Normal"
+                
+                print(f"HEAD TYPE: {head_type}, Roller ID: {roller_id_counter}")
+                if head_type == "High Head" or head_type == "Down Head":
+                    data = roller_dict[roller_id_counter]["defect"] | True
+                    defect_names = roller_dict[roller_id_counter]['defect_names'] + [head_type]
+                    roller_dict[roller_id_counter] = {'defect': data, 'defect_names': defect_names}
+
+                    annotated_frame = results[0].plot()
+
+                    roller_text = f"Roller Id : {roller_id_counter}"
+                    head_type_text = f"Head Type : {head_type}"
+                    distance_text = f"Distance : {distance_pixels:.2f}mm"
+
+                    cv2.putText(annotated_frame, roller_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    cv2.putText(annotated_frame, head_type_text, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    cv2.putText(annotated_frame, distance_text, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    
+                    annotated_frame = results[0].plot()
+                    save_path = f"{head_folder}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                    cv2.imwrite(save_path, annotated_frame)
+
+                    if allow_all:
+                        allow_all_path = f"{allow_all_folder_head}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                        cv2.imwrite(allow_all_path, annotated_frame)
         
-        current_bf_state = shared_data["bigface_presence"]
 
-        if current_bf_state and not previous_bf_state:
-            roller_id_counter += 1
+            previous_head_status = current_head_state
 
-            bf_triggered = True
-            roller_dict[roller_id_counter] = {'defect': False , 'defect_names': ["No defect"]}
-            shared_data["bf_inspected"] += 1
-            print(f"\n🎯 BF New roller detected! Assigned Roller ID: {roller_id_counter}")
+            if bf_triggered:
+                with frame_lock_bigface:
+                    np_frame = np.frombuffer(shared_frame_bigface.get_obj(), dtype=np.uint8).reshape(frame_shape)
+                    frame = np_frame.copy()
 
-        current_head_state = shared_data["head_classification"]
-
-        if current_head_state and not previous_head_status:
-
-            with frame_lock_bigface:
-                np_frame = np.frombuffer(shared_frame_bigface.get_obj(), dtype=np.uint8).reshape(frame_shape)
-                frame = np_frame.copy()
-
-            results = model_head.predict(frame, device=0, conf=0.7, verbose=False, half=True, agnostic_nms=True)
-
-            boxes = results[0].boxes.xyxy.cpu().numpy()  # shape: [N, 4]
-            classes = results[0].boxes.cls.cpu().numpy()  # class IDs
-
-            x1r, y1r, x2r, y2r = 0, 0, 0, 0
-            x1d, y1d, x2d, y2d = 0, 0, 0, 0 
-            for (x1,y1,x2,y2),cls in zip(boxes,classes):
-                if cls == 0:
-                    x1d, y1d, x2d, y2d = x1, y1, x2, y2
-                elif cls == 1:
-                    x1r, y1r, x2r, y2r = x1, y1, x2, y2
+                # proximity_count_bigface.value += 1
+                # pc = proximity_count_bigface.value
 
 
-            horizontal_distance = ( (x2r - x1r) - (x2d - x1d) )/2
-            vertical_distance = ( (y2r - y1r) - (y2d - y1d) )/2
+                results = model_bf.predict(frame, device=0, conf=model_conf_threshold, verbose=False, half=True, agnostic_nms=True)
 
-            distance_pixels = (horizontal_distance + vertical_distance)/2
-
-            if distance_pixels < latest_min:
-                head_type = "High Head"
-            elif distance_pixels > latest_max:
-                head_type = "Down Head"
-            else:
-                head_type = "Normal"
-            
-            print(f"HEAD TYPE: {head_type}, Roller ID: {roller_id_counter}")
-            if head_type == "High Head" or head_type == "Down Head":
-                data = roller_dict[roller_id_counter]["defect"] | True
-                defect_names = roller_dict[roller_id_counter]['defect_names'] + [head_type]
-                roller_dict[roller_id_counter] = {'defect': data, 'defect_names': defect_names}
-
-                annotated_frame = results[0].plot()
-
-                roller_text = f"Roller Id : {roller_id_counter}"
-                head_type_text = f"Head Type : {head_type}"
-                distance_text = f"Distance : {distance_pixels:.2f}mm"
-
-                cv2.putText(annotated_frame, roller_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                cv2.putText(annotated_frame, head_type_text, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                cv2.putText(annotated_frame, distance_text, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                if roller_class_index is None:
+                    return
                 
-                annotated_frame = results[0].plot()
-                save_path = f"{head_folder}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
-                cv2.imwrite(save_path, annotated_frame)
 
-                if allow_all:
-                    allow_all_path = f"{allow_all_folder_head}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
-                    cv2.imwrite(allow_all_path, annotated_frame)
-    
+                detections = []
+                if results and results[0].boxes.data is not None:
+                    for box in results[0].boxes.data:
+                        x1, y1, x2, y2, conf, cls = box 
+                        cls = int(cls)
+                        label = "roller" if cls == roller_class_index else class_names[cls]
+                        detections.append((label, int(x1), int(y1), int(x2), int(y2), cls, float(conf)))
 
-        previous_head_status = current_head_state
-
-        if bf_triggered:
-            with frame_lock_bigface:
-                np_frame = np.frombuffer(shared_frame_bigface.get_obj(), dtype=np.uint8).reshape(frame_shape)
-                frame = np_frame.copy()
-
-            # proximity_count_bigface.value += 1
-            # pc = proximity_count_bigface.value
-
-
-            results = model_bf.predict(frame, device=0, conf=model_conf_threshold, verbose=False, half=True, agnostic_nms=True)
-
-            if roller_class_index is None:
-                return
+                filtered_detections = filter_detections(detections, defect_thresholds)
+                detections = sorted(filtered_detections, key=lambda x: x[1])  # Sort by x-coordinate
+                annotated_frame = frame.copy()
+                annotated_frame = annotate_detections(annotated_frame, filtered_detections)
             
+                
+                # Check for roller and defect detections
+                has_roller_detection = any(detection[0] == "roller" for detection in detections)
+                has_defect_detection = any(detection[0] != "roller" for detection in detections)
 
-            detections = []
-            if results and results[0].boxes.data is not None:
-                for box in results[0].boxes.data:
-                    x1, y1, x2, y2, conf, cls = box 
-                    cls = int(cls)
-                    label = "roller" if cls == roller_class_index else class_names[cls]
-                    detections.append((label, int(x1), int(y1), int(x2), int(y2), cls, float(conf)))
+                if allow_all and has_roller_detection:
+                    allow_all_path = f"{allow_all_folder_bf}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                    cv2.imwrite(allow_all_path, annotated_frame)            
+                if has_roller_detection and has_defect_detection:
+                    save_path = f"{detected_folder}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                    cv2.imwrite(save_path, annotated_frame)
 
-            filtered_detections = filter_detections(detections, defect_thresholds)
-            detections = sorted(filtered_detections, key=lambda x: x[1])  # Sort by x-coordinate
-            annotated_frame = frame.copy()
-            annotated_frame = annotate_detections(annotated_frame, filtered_detections)
+                with annotated_frame_lock_bigface:
+                    np_annotated = np.frombuffer(shared_annotated_bigface.get_obj(), dtype=np.uint8).reshape(frame_shape)
+                    np.copyto(np_annotated, annotated_frame)
+                    
+                if len(detections) > 0:
+
+                    roller_only_sorted = [detection for detection in detections if detection[0] == "roller" and detection[-1] > 0.80]
+                    defect_only_sorted = [detection for detection in detections if detection[0] != "roller"]
+
+
+                    for detection in defect_only_sorted:
+                        roller_id = point_inside(detection[1:5] , roller_only_sorted , roller_id_counter)
+
+                        if roller_id == 0:
+                            continue
+
+                        defect_detected =  False if roller_id == 0 else True
+
+                        defect_name = "No Defect" if not defect_detected else class_names[detection[5]]
+
+                        if roller_id in roller_dict:
+                            data = roller_dict[roller_id]["defect"] | defect_detected
+                            defect_names = roller_dict[roller_id]['defect_names'] + [defect_name]
+                            roller_dict[roller_id] = {'defect': data, 'defect_names': defect_names}
+                        else:
+                            roller_dict[roller_id] = {'defect': defect_detected, 'defect_names': [defect_name]}
         
-            
-            # Check for roller and defect detections
-            has_roller_detection = any(detection[0] == "roller" for detection in detections)
-            has_defect_detection = any(detection[0] != "roller" for detection in detections)
 
-            if allow_all and has_roller_detection:
-                allow_all_path = f"{allow_all_folder_bf}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
-                cv2.imwrite(allow_all_path, annotated_frame)            
-            if has_roller_detection and has_defect_detection:
-                save_path = f"{detected_folder}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
-                cv2.imwrite(save_path, annotated_frame)
+                if shared_data['od_presence'] and not OD_PRESENCE and len(roller_dict) > 0:
+                    
+                    OD_PRESENCE = True 
 
-            with annotated_frame_lock_bigface:
-                np_annotated = np.frombuffer(shared_annotated_bigface.get_obj(), dtype=np.uint8).reshape(frame_shape)
-                np.copyto(np_annotated, annotated_frame)
-                
-            if len(detections) > 0:
+                    first_key = next(iter(roller_dict))
+                    defect_detected = roller_dict[first_key]["defect"]
+                    defect_names = roller_dict[first_key]['defect_names']
 
-                roller_only_sorted = [detection for detection in detections if detection[0] == "roller" and detection[-1] > 0.80]
-                defect_only_sorted = [detection for detection in detections if detection[0] != "roller"]
+                    if first_key in roller_dict:
+                        roller_data = roller_dict[first_key]
+                        defect_detected = roller_data['defect']
+                        defect_names = roller_data['defect_names']
 
+                        if defect_detected:
+                            shared_data["bf_not_ok_rollers"] += 1
+                        else:
+                            shared_data["bf_ok_rollers"] += 1
+                            if shared_data.get("od_inspected") is not None:
+                                shared_data["od_inspected"] += 1
 
-                for detection in defect_only_sorted:
-                    roller_id = point_inside(detection[1:5] , roller_only_sorted , roller_id_counter)
+                        unique_defects = set(defect_names)
 
-                    if roller_id == 0:
-                        continue
+                        for defect_name in unique_defects:
+                            defect_lower = defect_name.lower()
+                            
+                            if defect_lower == "rust":
+                                shared_data["bf_rust"] += 1
+                            elif defect_lower == "dent":
+                                shared_data["bf_dent"] += 1
+                            elif defect_lower == "damage":
+                                shared_data["bf_damage"] += 1
+                            elif defect_lower == "high head":
+                                shared_data["bf_high_head"] += 1
+                            elif defect_lower == "down head":
+                                shared_data["bf_down_head"] += 1
+                            elif defect_lower != "no defect":
+                                shared_data["bf_others"] += 1
 
-                    defect_detected =  False if roller_id == 0 else True
+                    roller_queue_bigface.put(defect_detected)
+                    roller_updation_dict[first_key] = int(defect_detected)
+                    roller_dict.pop(first_key)
 
-                    defect_name = "No Defect" if not defect_detected else class_names[detection[5]]
+                elif not shared_data['od_presence']:
+                    OD_PRESENCE = False  
+                    
+            previous_bf_state = current_bf_state
 
-                    if roller_id in roller_dict:
-                        data = roller_dict[roller_id]["defect"] | defect_detected
-                        defect_names = roller_dict[roller_id]['defect_names'] + [defect_name]
-                        roller_dict[roller_id] = {'defect': data, 'defect_names': defect_names}
-                    else:
-                        roller_dict[roller_id] = {'defect': defect_detected, 'defect_names': [defect_name]}
-    
-
-            if shared_data['od_presence'] and not OD_PRESENCE and len(roller_dict) > 0:
-                
-                OD_PRESENCE = True 
-
-                first_key = next(iter(roller_dict))
-                defect_detected = roller_dict[first_key]["defect"]
-                defect_names = roller_dict[first_key]['defect_names']
-
-                if first_key in roller_dict:
-                    roller_data = roller_dict[first_key]
-                    defect_detected = roller_data['defect']
-                    defect_names = roller_data['defect_names']
-
-                    if defect_detected:
-                        shared_data["bf_not_ok_rollers"] += 1
-                    else:
-                        shared_data["bf_ok_rollers"] += 1
-                        if shared_data.get("od_inspected") is not None:
-                            shared_data["od_inspected"] += 1
-
-                    unique_defects = set(defect_names)
-
-                    for defect_name in unique_defects:
-                        defect_lower = defect_name.lower()
-                        
-                        if defect_lower == "rust":
-                            shared_data["bf_rust"] += 1
-                        elif defect_lower == "dent":
-                            shared_data["bf_dent"] += 1
-                        elif defect_lower == "damage":
-                            shared_data["bf_damage"] += 1
-                        elif defect_lower == "high head":
-                            shared_data["bf_high_head"] += 1
-                        elif defect_lower == "down head":
-                            shared_data["bf_down_head"] += 1
-                        elif defect_lower != "no defect":
-                            shared_data["bf_others"] += 1
-
-                roller_queue_bigface.put(defect_detected)
-                roller_updation_dict[first_key] = int(defect_detected)
-                roller_dict.pop(first_key)
-
-            elif not shared_data['od_presence']:
-                OD_PRESENCE = False  
-                
-        previous_bf_state = current_bf_state
+    except Exception as e:
+        shared_data["system_error"] = True
         
 
 
 
 def handle_slot_control_bigface(roller_queue_bigface,shared_data,command_queue):
     """Control slot mechanism based on second proximity sensor."""
+    set_priority_below_normal()
+
     global roller_number
 
     a = False
@@ -678,6 +722,8 @@ def handle_slot_control_bigface(roller_queue_bigface,shared_data,command_queue):
 
 def capture_frames_od(shared_frame_od, frame_lock_od,frame_shape):
     """Continuously captureframes from the camera."""
+    set_priority_above_normal()
+    
     cap = cv2.VideoCapture(1)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, frame_shape[1])
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_shape[0])
@@ -699,6 +745,7 @@ def capture_frames_od(shared_frame_od, frame_lock_od,frame_shape):
 
 def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_path, queue_lock, shared_data, frame_shape, roller_updation_dict,shared_annotated_od, annotated_frame_lock_od):
     """Process frames for YOLO inference and track roller defects with pulse debounce & proper exit handling."""
+    set_priority_high()
 
     detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\OD\\Defect"
     os.makedirs(detected_folder, exist_ok=True)
@@ -725,9 +772,9 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
         return 0
 
 
-    od_conf = shared_data.get('od_conf_threshold', 0.25)
     od_model = YOLO(model_od_path).to("cuda")
     print("OD Model loaded in GPU")
+    configure_gpu_for_background()
 
     warmup_frame = r"Warmup OD.jpg"
     try:
@@ -760,126 +807,131 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
     defect_thresholds = get_thresholds_for_model(model_od_path, 'od')
     model_conf_threshold = get_model_confidence_threshold(model_od_path, 'od')
     
-    while True:
-        current_od_state = shared_data["od_presence"]
+    try:
+        while True:
+            current_od_state = shared_data["od_presence"]
 
-        if current_od_state and not previous_od_state:
-            od_triggered = True
+            if current_od_state and not previous_od_state:
+                od_triggered = True
 
-            roller_id_counter += 1
-            
-            roller_dict[roller_id_counter] = {'defect': False , 'defect_names': ["No defect"]}
-            print(f"\n🎯 OD New roller detected! Assigned Roller ID: {roller_id_counter}")
-
-        if od_triggered:
+                roller_id_counter += 1
                 
-            with frame_lock_od:
-                np_frame = np.frombuffer(shared_frame_od.get_obj(), dtype=np.uint8).reshape(frame_shape)
+                roller_dict[roller_id_counter] = {'defect': False , 'defect_names': ["No defect"]}
+                print(f"\n🎯 OD New roller detected! Assigned Roller ID: {roller_id_counter}")
 
-            results = od_model.predict(np_frame, device=0, conf=model_conf_threshold, verbose=False, half=True, agnostic_nms=True)
-            detections = []
-            if results and len(results) > 0:
-                boxes = results[0].boxes
-                if boxes is not None:
-                    for box in boxes:
-                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                        conf = float(box.conf[0])
-                        class_id = int(box.cls[0])
-                        label = od_model.names[class_id]
-                        
-                        detections.append((label, x1, y1, x2, y2, class_id, conf))
-
-            filtered_detections = filter_detections(detections, defect_thresholds)
-            detections = sorted(filtered_detections, key=lambda x: x[1])  # Sort by x-coordinate
-            annotated_frame = np_frame.copy()
-            annotated_frame = annotate_detections(annotated_frame, filtered_detections)
-        
-
-            # Check for roller and defect detections
-            has_roller_detection = any(detection[0] == "roller" for detection in detections)
-            has_defect_detection = any(detection[0] != "roller" for detection in detections)
-
-            if allow_all and has_roller_detection:
-                allow_all_path = f"{allow_all_folder_od}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
-                cv2.imwrite(allow_all_path, annotated_frame)
-            if has_roller_detection and has_defect_detection:
-                save_path = f"{detected_folder}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
-                cv2.imwrite(save_path, annotated_frame)
-
-            with annotated_frame_lock_od:
-                np_annotated = np.frombuffer(shared_annotated_od.get_obj(), dtype=np.uint8).reshape(frame_shape)
-                np.copyto(np_annotated, annotated_frame)
-
-            if len(detections) > 0:
-                roller_only_sorted = [detection for detection in detections if detection[0] == "roller" and detection[-1] > 0.80]
-                defect_only_sorted = [detection for detection in detections if detection[0] != "roller"]
-
-                for detection in defect_only_sorted:
+            if od_triggered:
                     
-                    roller_id = point_inside( detection[1:5] , roller_only_sorted , roller_id_counter)
+                with frame_lock_od:
+                    np_frame = np.frombuffer(shared_frame_od.get_obj(), dtype=np.uint8).reshape(frame_shape)
 
-                    if roller_id == 0:
-                        continue
-                    
-                    defect_detected =  False if roller_id == 0 else True
-
-                    defect_name = "No Defect" if not defect_detected else od_model.names[detection[5]]
-
-                    if roller_id in roller_dict:
-                        roller_dict[roller_id]['defect'] |= defect_detected  # OR logic
-                        roller_dict[roller_id]['defect_names'].append(defect_name)
-                    else:
-                        roller_dict[roller_id] = {'defect': defect_detected, 'defect_names': [defect_name]}
-
-            if shared_data['bigface'] and not BIGFACE_DETECTED and len(roller_dict) > 0:
-                BIGFACE_DETECTED = True
-
-                defect_detected = list(roller_dict.values())[0]['defect']
-
-                first_key = next(iter(roller_dict))
-
-                if first_key in roller_dict:
-                    if roller_updation_dict[first_key] == 0:
-                        roller_data = roller_dict[first_key]
-                        defect_detected = roller_data['defect']
-                        defect_names = roller_data['defect_names']
-
-                        if defect_detected:
-                            shared_data["od_not_ok_rollers"] += 1
-                        else:
-                            shared_data["od_ok_rollers"] += 1
-
-                        unique_defects = set(defect_names)
-
-                        for defect_name in unique_defects:
-                            defect_lower = defect_name.lower()
+                results = od_model.predict(np_frame, device=0, conf=model_conf_threshold, verbose=False, half=True, agnostic_nms=True)
+                detections = []
+                if results and len(results) > 0:
+                    boxes = results[0].boxes
+                    if boxes is not None:
+                        for box in boxes:
+                            x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                            conf = float(box.conf[0])
+                            class_id = int(box.cls[0])
+                            label = od_model.names[class_id]
                             
-                            if defect_lower == "rust":
-                                shared_data["od_rust"] += 1
-                            elif defect_lower == "dent":
-                                shared_data["od_dent"] += 1
-                            elif defect_lower == "damage":
-                                shared_data["od_damage"] += 1
-                            elif defect_lower == "damage on end" or defect_lower == "damage_on_end":
-                                shared_data["od_damage_on_end"] += 1
-                            elif defect_lower == "spherical mark" or defect_lower == "spherical_mark":
-                                shared_data["od_spherical_mark"] += 1
-                            elif defect_lower != "no defect":
-                                shared_data["od_others"] += 1
+                            detections.append((label, x1, y1, x2, y2, class_id, conf))
 
-
-                roller_dict.pop(first_key) 
-                if roller_updation_dict[first_key] == 0 :
-                    roller_queue_od.put(defect_detected)
-                del roller_updation_dict[first_key]
+                filtered_detections = filter_detections(detections, defect_thresholds)
+                detections = sorted(filtered_detections, key=lambda x: x[1])  # Sort by x-coordinate
+                annotated_frame = np_frame.copy()
+                annotated_frame = annotate_detections(annotated_frame, filtered_detections)
             
-            elif not shared_data['bigface']:
-                BIGFACE_DETECTED = False
 
-        previous_od_state = current_od_state
+                # Check for roller and defect detections
+                has_roller_detection = any(detection[0] == "roller" for detection in detections)
+                has_defect_detection = any(detection[0] != "roller" for detection in detections)
+
+                if allow_all and has_roller_detection:
+                    allow_all_path = f"{allow_all_folder_od}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                    cv2.imwrite(allow_all_path, annotated_frame)
+                if has_roller_detection and has_defect_detection:
+                    save_path = f"{detected_folder}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                    cv2.imwrite(save_path, annotated_frame)
+
+                with annotated_frame_lock_od:
+                    np_annotated = np.frombuffer(shared_annotated_od.get_obj(), dtype=np.uint8).reshape(frame_shape)
+                    np.copyto(np_annotated, annotated_frame)
+
+                if len(detections) > 0:
+                    roller_only_sorted = [detection for detection in detections if detection[0] == "roller" and detection[-1] > 0.80]
+                    defect_only_sorted = [detection for detection in detections if detection[0] != "roller"]
+
+                    for detection in defect_only_sorted:
+                        
+                        roller_id = point_inside( detection[1:5] , roller_only_sorted , roller_id_counter)
+
+                        if roller_id == 0:
+                            continue
+                        
+                        defect_detected =  False if roller_id == 0 else True
+
+                        defect_name = "No Defect" if not defect_detected else od_model.names[detection[5]]
+
+                        if roller_id in roller_dict:
+                            roller_dict[roller_id]['defect'] |= defect_detected  # OR logic
+                            roller_dict[roller_id]['defect_names'].append(defect_name)
+                        else:
+                            roller_dict[roller_id] = {'defect': defect_detected, 'defect_names': [defect_name]}
+
+                if shared_data['bigface'] and not BIGFACE_DETECTED and len(roller_dict) > 0:
+                    BIGFACE_DETECTED = True
+
+                    defect_detected = list(roller_dict.values())[0]['defect']
+
+                    first_key = next(iter(roller_dict))
+
+                    if first_key in roller_dict:
+                        if roller_updation_dict[first_key] == 0:
+                            roller_data = roller_dict[first_key]
+                            defect_detected = roller_data['defect']
+                            defect_names = roller_data['defect_names']
+
+                            if defect_detected:
+                                shared_data["od_not_ok_rollers"] += 1
+                            else:
+                                shared_data["od_ok_rollers"] += 1
+
+                            unique_defects = set(defect_names)
+
+                            for defect_name in unique_defects:
+                                defect_lower = defect_name.lower()
+                                
+                                if defect_lower == "rust":
+                                    shared_data["od_rust"] += 1
+                                elif defect_lower == "dent":
+                                    shared_data["od_dent"] += 1
+                                elif defect_lower == "damage":
+                                    shared_data["od_damage"] += 1
+                                elif defect_lower == "damage on end" or defect_lower == "damage_on_end":
+                                    shared_data["od_damage_on_end"] += 1
+                                elif defect_lower == "spherical mark" or defect_lower == "spherical_mark":
+                                    shared_data["od_spherical_mark"] += 1
+                                elif defect_lower != "no defect":
+                                    shared_data["od_others"] += 1
+
+
+                    roller_dict.pop(first_key) 
+                    if roller_updation_dict[first_key] == 0 :
+                        roller_queue_od.put(defect_detected)
+                    del roller_updation_dict[first_key]
+                
+                elif not shared_data['bigface']:
+                    BIGFACE_DETECTED = False
+
+            previous_od_state = current_od_state
+    except Exception as e:
+        shared_data["system_error"] = True
 
 def handle_slot_control_od(roller_queue_od, shared_data, command_queue):
     """Control slot mechanism based on second proximity sensor."""
+    set_priority_below_normal()
+
     processing = False
     while True:
         if shared_data["od"] and not processing and not roller_queue_od.empty():

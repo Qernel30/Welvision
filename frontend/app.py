@@ -418,6 +418,9 @@ class WelVisionApp(tk.Tk):
         # Track inspection session start time
         self.inspection_start_time = None
         
+        # System error flag
+        self.shared_data["system_error"] = False
+        
         self.command_queue = Queue()
         
         self.proximity_count_od = Value('i', 0)
@@ -526,6 +529,10 @@ class WelVisionApp(tk.Tk):
             print("Inspection is already running!")
             return
         
+        # Reset system error flag
+        if hasattr(self, 'shared_data'):
+            self.shared_data['system_error'] = False
+        
         self.inspection_running = True
         if self.inference_tab and self.inference_tab.control_panel:
             self.inference_tab.control_panel.enable_stop()
@@ -544,6 +551,9 @@ class WelVisionApp(tk.Tk):
         # Start subprocesses
         for process in self.processes:
             process.start()
+        
+        # Start monitoring for system errors
+        self._monitor_system_error()
         
     
     def stop_inspection(self):
@@ -801,6 +811,75 @@ class WelVisionApp(tk.Tk):
         if hasattr(self, 'shared_data'):
             self.shared_data['od_conf_threshold'] = od_conf
             self.shared_data['bf_conf_threshold'] = bf_conf
+    
+    def _monitor_system_error(self):
+        """Monitor for system errors and handle them."""
+        if hasattr(self, 'shared_data') and self.shared_data:
+            # Check if system error occurred
+            if self.shared_data.get('system_error', False):
+                # Reset the flag
+                self.shared_data['system_error'] = False
+                
+                # Show error popup
+                self._show_system_error_popup()
+        
+        # Continue monitoring every 500ms if inspection is running
+        if hasattr(self, 'inspection_running') and self.inspection_running:
+            self.after(500, self._monitor_system_error)
+    
+    def _show_system_error_popup(self):
+        """Show error popup and stop all processes."""
+        from tkinter import messagebox
+        
+        # Stop inspection immediately
+        if hasattr(self, 'inspection_running') and self.inspection_running:
+            try:
+                # Turn off PLC lights
+                plc_client = snap7.client.Client() 
+                try:
+                    plc_client.connect(self.PLC_IP, self.RACK, self.SLOT)
+                    
+                    data = plc_client.read_area(Areas.DB, self.DB_NUMBER, 0, 2)
+                    set_bool(data, byte_index=1, bool_index=6, value=False)
+                    set_bool(data, byte_index=1, bool_index=7, value=False)
+                    plc_client.write_area(Areas.DB, self.DB_NUMBER, 0, data)
+                    
+                    plc_client.disconnect()
+                except:
+                    pass
+                
+                # Stop all processes
+                self.inspection_running = False
+                if self.inference_tab and self.inference_tab.control_panel:
+                    self.inference_tab.control_panel.enable_start()
+                
+                # Use process manager to stop all inference processes
+                self.process_manager.stop_all_inference()
+                
+                # Clean up GPU memory
+                self.process_manager.cleanup_gpu_memory()
+                
+                # Clear process references
+                self.plc_process = None
+                self.processes = []
+                
+            except Exception as e:
+                print(f"❌ Error during emergency shutdown: {e}")
+        
+        # Show error message
+        messagebox.showerror(
+            "System Error Detected",
+            "⚠️ A critical system error has occurred!\n\n"
+            "The inspection process has been stopped automatically.\n\n"
+            "Possible causes:\n"
+            "• GPU memory overflow\n"
+            "• Model inference failure\n"
+            "• Camera disconnection\n"
+            "• PLC communication error\n\n"
+            "Recommended action:\n"
+            "Please restart the application to clear the error state.\n\n"
+            "Click OK to continue using other features."
+        )
     
     def on_closing(self):
         """Handle application closing."""
