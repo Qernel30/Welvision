@@ -99,13 +99,20 @@ class DiagnosisTab:
         charts_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
         charts_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
-        # Status Chart (left)
-        self.status_chart = StatusChart(charts_frame, self)
-        self.status_chart.create()
+        # LAZY LOADING: Create charts only when data is loaded
+        # Show placeholder message initially
+        self.charts_placeholder = tk.Label(
+            charts_frame,
+            text="📊 Generate a report to view charts",
+            font=Fonts.SUBTITLE,
+            fg="#888888",
+            bg=Colors.PRIMARY_BG,
+            pady=50
+        )
+        self.charts_placeholder.pack(fill=tk.BOTH, expand=True)
         
-        # Defectwise Chart (right)
-        self.defectwise_chart = DefectwiseChart(charts_frame, self)
-        self.defectwise_chart.create()
+        # Store charts frame reference for later
+        self.charts_frame = charts_frame
     
     def generate_report(self):
         """Generate report based on selected filters."""
@@ -116,9 +123,19 @@ class DiagnosisTab:
     
     def save_chart(self):
         """Save the current charts as images."""
+        import os
+        import subprocess
+        from tkinter import messagebox
+        
         try:
-            import os
-            from tkinter import messagebox
+            # Check if data exists
+            if not self.current_data:
+                messagebox.showwarning(
+                    "No Data",
+                    "No data found for the applied filters.\n\n"
+                    "Please generate a report first before saving charts."
+                )
+                return
             
             # Get filters
             filters = self.control_panel.get_filters()
@@ -157,12 +174,20 @@ class DiagnosisTab:
                 # Save the figure
                 self.defectwise_chart.figure.savefig(defectwise_filepath, dpi=300, bbox_inches='tight')
             
-            messagebox.showinfo(
+            # Create custom dialog with "Open Location" option
+            result = messagebox.askquestion(
                 "Charts Saved", 
-                f"Charts saved successfully:\n\n"
+                f"Charts saved successfully!\n\n"
                 f"Status Chart:\n{status_filepath}\n\n"
-                f"Defectwise Chart:\n{defectwise_filepath}"
+                f"Defectwise Chart:\n{defectwise_filepath}\n\n"
+                f"Do you want to open the folder location?",
+                icon='info'
             )
+            
+            if result == 'yes':
+                # Open the parent directory (Charts folder)
+                charts_folder = os.path.dirname(status_filepath)
+                subprocess.run(['explorer', charts_folder])
             
         except Exception as e:
             print(f"❌ Error saving charts: {e}")
@@ -172,14 +197,20 @@ class DiagnosisTab:
     
     def export_to_excel(self):
         """Export report data to Excel file."""
+        import os
+        import subprocess
+        import pandas as pd
+        from tkinter import messagebox
+        
         if not self.current_data:
-            print("⚠️ No data to export")
+            messagebox.showwarning(
+                "No Data",
+                "No data found for the applied filters.\n\n"
+                "Please generate a report first before exporting."
+            )
             return
         
         try:
-            import os
-            import pandas as pd
-            from tkinter import messagebox
             
             # Get filters
             filters = self.control_panel.get_filters()
@@ -231,7 +262,18 @@ class DiagnosisTab:
                     )
                     worksheet.column_dimensions[chr(65 + idx)].width = min(max_length + 2, 50)
             
-            messagebox.showinfo("Export Success", f"Report exported to:\n{filepath}")
+            # Create custom dialog with "Open Location" option
+            result = messagebox.askquestion(
+                "Export Success",
+                f"Report exported successfully!\n\n"
+                f"File Location:\n{filepath}\n\n"
+                f"Do you want to open the folder location?",
+                icon='info'
+            )
+            
+            if result == 'yes':
+                # Open the folder containing the exported file
+                subprocess.run(['explorer', base_path])
             
         except Exception as e:
             print(f"❌ Error exporting to Excel: {e}")
@@ -446,6 +488,19 @@ class DiagnosisTab:
     
     def _update_charts(self, data, report_type):
         """Update both charts with the report data based on report type."""
+        # LAZY LOADING: Create charts only when needed
+        if self.status_chart is None or self.defectwise_chart is None:
+            # Remove placeholder
+            if hasattr(self, 'charts_placeholder') and self.charts_placeholder:
+                self.charts_placeholder.destroy()
+            
+            # Create charts for the first time
+            self.status_chart = StatusChart(self.charts_frame, self)
+            self.status_chart.create()
+            
+            self.defectwise_chart = DefectwiseChart(self.charts_frame, self)
+            self.defectwise_chart.create()
+        
         # Always update charts, even if data is empty
         if report_type == 'BF':
             # Calculate BF statistics for status chart

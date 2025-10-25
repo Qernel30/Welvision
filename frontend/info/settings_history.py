@@ -157,18 +157,21 @@ class SettingsHistory:
             cursor="hand2"
         ).pack(side=tk.LEFT, padx=5)
         
-        tk.Button(
-            buttons_frame,
-            text="🗑️ Clear History",
-            font=Fonts.TEXT_BOLD,
-            bg="#DC3545",  # Red
-            fg=Colors.WHITE,
-            activebackground="#c82333",
-            activeforeground=Colors.WHITE,
-            command=self.clear_history,
-            width=15,
-            cursor="hand2"
-        ).pack(side=tk.LEFT, padx=5)
+        # Clear History button - Only for Admin and Supervisor
+        user_role = getattr(self.app, 'current_role', 'Operator')
+        if Permissions.can_manage_users(user_role):  # Admin or Supervisor
+            tk.Button(
+                buttons_frame,
+                text="🗑️ Clear History",
+                font=Fonts.TEXT_BOLD,
+                bg="#DC3545",  # Red
+                fg=Colors.WHITE,
+                activebackground="#c82333",
+                activeforeground=Colors.WHITE,
+                command=self.clear_history,
+                width=15,
+                cursor="hand2"
+            ).pack(side=tk.LEFT, padx=5)
         
         # Treeview frame
         tree_frame = tk.Frame(main_frame, bg=Colors.PRIMARY_BG)
@@ -418,8 +421,15 @@ Defect Thresholds:
     
     def export_to_excel(self):
         """Export threshold history to Excel file."""
+        import subprocess
+        from tkinter import messagebox
+        
         if not self.current_data:
-            messagebox.showwarning("No Data", "No data to export. Please load history first.")
+            messagebox.showwarning(
+                "No Data",
+                "No data found for the applied filters.\n\n"
+                "Please load threshold history first before exporting."
+            )
             return
         
         try:
@@ -492,7 +502,18 @@ Defect Thresholds:
                     )
                     worksheet.column_dimensions[chr(65 + idx)].width = min(max_length + 2, 50)
             
-            messagebox.showinfo("Export Success", f"Threshold history exported to:\n{filepath}")
+            # Create custom dialog with "Open Location" option
+            result = messagebox.askquestion(
+                "Export Success",
+                f"Threshold history exported successfully!\n\n"
+                f"File Location:\n{filepath}\n\n"
+                f"Do you want to open the folder location?",
+                icon='info'
+            )
+            
+            if result == 'yes':
+                # Open the folder containing the exported file
+                subprocess.run(['explorer', base_path])
         
         except Exception as e:
             print(f"❌ Error exporting to Excel: {e}")

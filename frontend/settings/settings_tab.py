@@ -82,7 +82,8 @@ class SettingsTab:
         # Unbind previous mousewheel if it was bound
         if self._mousewheel_bound:
             try:
-                self.parent.unbind_all("<MouseWheel>")
+                if hasattr(self, 'canvas') and self.canvas:
+                    self.canvas.unbind_all("<MouseWheel>")
                 self._mousewheel_bound = False
             except:
                 pass
@@ -96,10 +97,17 @@ class SettingsTab:
         scrollbar = ttk.Scrollbar(main_container, orient="vertical", command=self.canvas.yview)
         self.scrollable_frame = tk.Frame(self.canvas, bg=Colors.PRIMARY_BG)
         
-        self.scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        )
+        # Debounced scroll region update
+        self._scroll_update_id = None
+        
+        def _update_scroll_region(event=None):
+            # Cancel pending update
+            if self._scroll_update_id:
+                self.canvas.after_cancel(self._scroll_update_id)
+            # Schedule new update after 100ms
+            self._scroll_update_id = self.canvas.after(100, lambda: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+        
+        self.scrollable_frame.bind("<Configure>", _update_scroll_region)
         
         self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw", width=self.canvas.winfo_reqwidth())
         self.canvas.configure(yscrollcommand=scrollbar.set)
@@ -114,21 +122,29 @@ class SettingsTab:
         
         self.canvas.bind("<Configure>", _on_canvas_configure)
         
-        # Enable mouse wheel scrolling with safety check
+        # Enable mouse wheel scrolling - OPTIMIZED VERSION
         def _on_mousewheel(event):
-            try:
-                if self.canvas and self.canvas.winfo_exists():
-                    self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-            except tk.TclError:
-                # Canvas was destroyed, unbind the event
+            # Smooth scrolling with larger steps
+            self.canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+        
+        def _bind_mousewheel(event=None):
+            self.canvas.bind_all("<MouseWheel>", _on_mousewheel)
+            self._mousewheel_bound = True
+        
+        def _unbind_mousewheel(event=None):
+            if self._mousewheel_bound:
                 try:
-                    self.parent.unbind_all("<MouseWheel>")
+                    self.canvas.unbind_all("<MouseWheel>")
                     self._mousewheel_bound = False
                 except:
                     pass
         
-        self.parent.bind_all("<MouseWheel>", _on_mousewheel)
-        self._mousewheel_bound = True
+        # Bind only when mouse enters the canvas area
+        self.canvas.bind("<Enter>", _bind_mousewheel)
+        self.canvas.bind("<Leave>", _unbind_mousewheel)
+        
+        # Initial bind
+        _bind_mousewheel()
         
         # Settings Title
         title_label = tk.Label(
@@ -406,6 +422,26 @@ class SettingsTab:
             print("Preview already running!")
             return
         
+        # ===== VALIDATION CHECKS BEFORE PREVIEW =====
+        # 1. Check if models are available
+        models_ok, models_error = self._check_models_available()
+        if not models_ok:
+            messagebox.showerror("Models Check Failed", models_error)
+            return
+        
+        # 2. Check PLC connection
+        plc_ok, plc_error = self._check_plc_connection()
+        if not plc_ok:
+            messagebox.showerror("PLC Check Failed", plc_error)
+            return
+        
+        # 3. Check cameras
+        cameras_ok, cameras_error = self._check_cameras_connected()
+        if not cameras_ok:
+            messagebox.showerror("Camera Check Failed", cameras_error)
+            return
+        
+        # All checks passed - proceed with preview
         # Get selected models
         selected_models = self.model_selector.get_selected_models()
         bf_model_path = selected_models['bf_model_path']
@@ -460,6 +496,9 @@ class SettingsTab:
         # Block navigation to Inference and System Check pages
         self._block_navigation_buttons()
         
+        # Block logout button
+        self._block_logout_button()
+        
         # Block model dropdowns and save button
         self._block_model_dropdowns()
         self._block_save_button()
@@ -513,6 +552,9 @@ class SettingsTab:
         
         # Unblock navigation buttons
         self._unblock_navigation_buttons()
+        
+        # Unblock logout button
+        self._unblock_logout_button()
         
         # Unblock model dropdowns and Save Settings button
         self._unblock_model_dropdowns()
@@ -888,6 +930,24 @@ class SettingsTab:
                     bg=nav_button.inactive_bg
                 )
     
+    def _block_logout_button(self):
+        """Block the logout button during preview with grey color."""
+        if hasattr(self.app, 'logout_button') and self.app.logout_button:
+            self.app.logout_button.config(
+                state=tk.DISABLED,
+                bg="#6c757d",  # Grey
+                fg=Colors.WHITE  # White text
+            )
+    
+    def _unblock_logout_button(self):
+        """Unblock the logout button after preview with red color."""
+        if hasattr(self.app, 'logout_button') and self.app.logout_button:
+            self.app.logout_button.config(
+                state=tk.NORMAL,
+                bg=Colors.DANGER,  # Red
+                fg=Colors.WHITE  # White text
+            )
+    
     def _block_save_button(self):
         """Block the Save Settings button during preview with red color."""
         if hasattr(self, 'save_button') and self.save_button:
@@ -966,12 +1026,82 @@ class SettingsTab:
             "Please stop the preview before closing the application."
         )
     
+    def _check_models_available(self):
+        """
+        Check if both BF and OD models are available.
+        
+        Returns:
+            tuple: (bool, str) - (success, error_message)
+        """
+        bf_model_path = getattr(self.app, 'selected_bf_model_path', None)
+        od_model_path = getattr(self.app, 'selected_od_model_path', None)
+        
+        if not bf_model_path or not od_model_path:
+            return False, "⚠️ Models Not Available\n\nBoth BF and OD models are required.\n\nPlease upload models in Model Management tab first."
+        
+        # Check if model files actually exist
+        import os
+        if not os.path.exists(bf_model_path):
+            return False, f"⚠️ BF Model File Not Found\n\nPath: {bf_model_path}\n\nPlease upload the model again."
+        
+        if not os.path.exists(od_model_path):
+            return False, f"⚠️ OD Model File Not Found\n\nPath: {od_model_path}\n\nPlease upload the model again."
+        
+        return True, ""
+    
+    def _check_plc_connection(self):
+        """
+        Check PLC connection.
+        
+        Returns:
+            tuple: (bool, str) - (success, error_message)
+        """
+        try:
+            import snap7
+            from snap7.type import Areas
+            
+            plc = snap7.client.Client()
+            plc.connect(AppConfig.PLC_IP, AppConfig.PLC_RACK, AppConfig.PLC_SLOT)
+            
+            if plc.get_connected():
+                plc.disconnect()
+                return True, ""
+            else:
+                return False, f"⚠️ PLC Not Connected\n\nCannot connect to PLC at {AppConfig.PLC_IP}\n\nPlease check:\n• PLC is powered on\n• Network cable is connected\n• IP address is correct"
+        
+        except Exception as e:
+            return False, f"⚠️ PLC Connection Failed\n\nError: {str(e)}\n\nPlease check PLC connection and network settings."
+    
+    def _check_cameras_connected(self):
+        """
+        Check if cameras are connected.
+        
+        Returns:
+            tuple: (bool, str) - (success, error_message)
+        """
+        import cv2
+        cameras_connected = []
+        
+        # Check camera indices 0 and 1
+        for idx in [0, 1]:
+            cap = cv2.VideoCapture(idx)
+            if cap.isOpened():
+                cameras_connected.append(idx)
+                cap.release()
+        
+        if len(cameras_connected) < 2:
+            camera_names = {0: "BF Camera", 1: "OD Camera"}
+            missing = [camera_names[i] for i in [0, 1] if i not in cameras_connected]
+            return False, f"⚠️ Cameras Not Connected\n\nRequired: 2 cameras\nDetected: {len(cameras_connected)} camera(s)\n\nMissing: {', '.join(missing)}\n\nPlease connect all cameras and try again."
+        
+        return True, ""
+    
     def cleanup(self):
         """Cleanup method called when settings tab is destroyed."""
-        # Unbind mousewheel event
+        # Unbind mousewheel event immediately
         if self._mousewheel_bound:
             try:
-                self.parent.unbind_all("<MouseWheel>")
+                self.canvas.unbind_all("<MouseWheel>")
                 self._mousewheel_bound = False
             except:
                 pass

@@ -14,15 +14,6 @@ class RollerDatabase:
     """Database handler for roller inspection tracking."""
     
     def __init__(self):
-        """Initialize database connection parameters."""
-
-        self.host = AppConfig.DB_HOST
-        self.port = AppConfig.DB_PORT
-        self.user = AppConfig.DB_USER
-        self.password = AppConfig.DB_PASSWORD
-        self.database = AppConfig.DB_DATABASE
-        self.connection = None
-
         """
         Initialize database connection.
         
@@ -211,7 +202,7 @@ def save_to_database(employee_id, start_time, shared_data,
     Returns:
         bool: True if successful, False otherwise
     """
-    db = RollerDatabase(host=host, user=user, password=password, database=database)
+    db = RollerDatabase()
     
     if db.connect():
         success = db.save_inspection_session(employee_id, start_time, shared_data)

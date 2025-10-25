@@ -88,15 +88,38 @@ class ThresholdPanel:
         )
         section_frame.grid(row=row, column=column, padx=10, pady=10, sticky="nsew")
         
-        # Create scrollable canvas
-        canvas = tk.Canvas(section_frame, bg=Colors.PRIMARY_BG, highlightthickness=0)
+        # Create scrollable canvas with optimized scrolling
+        canvas = tk.Canvas(section_frame, bg=Colors.PRIMARY_BG, highlightthickness=0, height=200)
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
         scrollbar = ttk.Scrollbar(section_frame, orient="vertical", command=canvas.yview)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        
+        # Debounced scroll region update
+        scroll_update_id = None
+        
+        def update_scroll_region(event=None):
+            nonlocal scroll_update_id
+            if scroll_update_id:
+                canvas.after_cancel(scroll_update_id)
+            scroll_update_id = canvas.after(100, lambda: canvas.configure(scrollregion=canvas.bbox("all")))
+        
+        canvas.bind('<Configure>', update_scroll_region)
+        
+        # Optimized mousewheel scrolling
+        def on_mousewheel(event):
+            canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+        
+        def bind_mousewheel(event=None):
+            canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        def unbind_mousewheel(event=None):
+            canvas.unbind_all("<MouseWheel>")
+        
+        canvas.bind("<Enter>", bind_mousewheel)
+        canvas.bind("<Leave>", unbind_mousewheel)
         
         # Create frame for sliders
         sliders_frame = tk.Frame(canvas, bg=Colors.PRIMARY_BG)

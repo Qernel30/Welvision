@@ -44,7 +44,8 @@ class InfoTab:
         # Unbind previous mousewheel if it was bound
         if self._mousewheel_bound:
             try:
-                self.parent.unbind_all("<MouseWheel>")
+                if hasattr(self, 'canvas') and self.canvas:
+                    self.canvas.unbind_all("<MouseWheel>")
                 self._mousewheel_bound = False
             except:
                 pass
@@ -78,10 +79,17 @@ class InfoTab:
         scrollbar = ttk.Scrollbar(main_container, orient="vertical", command=self.canvas.yview)
         self.scrollable_frame = tk.Frame(self.canvas, bg=Colors.PRIMARY_BG)
         
-        self.scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        )
+        # Debounced scroll region update
+        self._scroll_update_id = None
+        
+        def _update_scroll_region(event=None):
+            # Cancel pending update
+            if self._scroll_update_id:
+                self.canvas.after_cancel(self._scroll_update_id)
+            # Schedule new update after 100ms
+            self._scroll_update_id = self.canvas.after(100, lambda: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+        
+        self.scrollable_frame.bind("<Configure>", _update_scroll_region)
         
         self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw", width=self.canvas.winfo_reqwidth())
         self.canvas.configure(yscrollcommand=scrollbar.set)
@@ -96,54 +104,93 @@ class InfoTab:
         
         self.canvas.bind("<Configure>", _on_canvas_configure)
         
-        # Enable mouse wheel scrolling with safety check
+        # Enable mouse wheel scrolling - OPTIMIZED VERSION
         def _on_mousewheel(event):
-            try:
-                if self.canvas and self.canvas.winfo_exists():
-                    self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-            except tk.TclError:
-                # Canvas was destroyed, unbind the event
+            # Smooth scrolling with larger steps
+            self.canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+        
+        def _bind_mousewheel(event=None):
+            self.canvas.bind_all("<MouseWheel>", _on_mousewheel)
+            self._mousewheel_bound = True
+        
+        def _unbind_mousewheel(event=None):
+            if self._mousewheel_bound:
                 try:
-                    self.parent.unbind_all("<MouseWheel>")
+                    self.canvas.unbind_all("<MouseWheel>")
                     self._mousewheel_bound = False
                 except:
                     pass
         
-        self.parent.bind_all("<MouseWheel>", _on_mousewheel)
-        self._mousewheel_bound = True
+        # Bind only when mouse enters the canvas area
+        self.canvas.bind("<Enter>", _bind_mousewheel)
+        self.canvas.bind("<Leave>", _unbind_mousewheel)
         
-        # ===== PAGE 1: TITLE MANAGEMENT =====
+        # Initial bind
+        _bind_mousewheel()
+        
+        # ===== LAZY LOADING - Create components on-demand =====
+        # Show loading message while components load
+        loading_label = tk.Label(
+            self.scrollable_frame,
+            text="⏳ Loading components...",
+            font=Fonts.SUBTITLE,
+            fg="#FFD700",
+            bg=Colors.PRIMARY_BG,
+            pady=50
+        )
+        loading_label.pack()
+        
+        # Load components asynchronously to avoid blocking UI
+        self.parent.after(50, lambda: self._load_components(loading_label))
+    
+    def _load_components(self, loading_label):
+        """Load all components asynchronously."""
+        # Remove loading message
+        loading_label.destroy()
+        
+        # Load components one by one
         self.title_management = TitleManagement(self.scrollable_frame, self.app)
         self.title_management.create()
         
-        # ===== PAGE 2 SECTIONS =====
-        
-        # Settings History
+        # Small delay between components to prevent UI freeze
+        self.parent.after(10, self._load_settings_history)
+    
+    def _load_settings_history(self):
+        """Load settings history component."""
         self.settings_history = SettingsHistory(self.scrollable_frame, self.app)
         self.settings_history.create()
         
-        # System Information
+        self.parent.after(10, self._load_system_info)
+    
+    def _load_system_info(self):
+        """Load system information component."""
         self.system_information = SystemInformation(self.scrollable_frame, self.app)
         self.system_information.create()
         
-        # Database Configuration
+        self.parent.after(10, self._load_database_config)
+    
+    def _load_database_config(self):
+        """Load database config component."""
         self.database_config = DatabaseConfig(self.scrollable_frame, self.app)
         self.database_config.create()
         
-        # User Manual
+        self.parent.after(10, self._load_user_manual)
+    
+    def _load_user_manual(self):
+        """Load user manual component."""
         self.user_manual = UserManual(self.scrollable_frame, self.app)
         self.user_manual.create()
         
-        # Update canvas scroll region
+        # Final scroll region update
         self.canvas.update_idletasks()
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
     
     def cleanup(self):
         """Cleanup method called when tab is destroyed."""
-        # Unbind mousewheel event
+        # Unbind mousewheel event immediately
         if self._mousewheel_bound:
             try:
-                self.parent.unbind_all("<MouseWheel>")
+                self.canvas.unbind_all("<MouseWheel>")
                 self._mousewheel_bound = False
             except:
                 pass

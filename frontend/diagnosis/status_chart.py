@@ -121,6 +121,9 @@ class StatusChart:
                 data.get('Overall Rejected', 0)
             ]
         
+        # Set ylabel
+        self.ax.set_ylabel("Count", fontsize=12)
+        
         # Create bars with specific colors
         bars = self.ax.bar(categories, values, color=['#4472C4', '#70AD47', '#FF0000'], width=0.6)
         

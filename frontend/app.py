@@ -626,6 +626,14 @@ class WelVisionApp(tk.Tk):
                 except:
                     pass
         
+        # Cleanup info tab when navigating away
+        if hasattr(self, 'info_tab') and self.info_tab is not None and tab_id != "info":
+            try:
+                if hasattr(self.info_tab, 'cleanup'):
+                    self.info_tab.cleanup()
+            except:
+                pass
+        
         # Clear current tab content
         if self.current_tab_frame:
             self.current_tab_frame.destroy()

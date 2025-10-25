@@ -143,6 +143,9 @@ class SystemCheckTab:
             # Block Inference and Settings navigation buttons
             self._block_navigation_buttons()
             
+            # Block logout button
+            self._block_logout_button()
+            
             # Block Control Settings pattern selection
             if self.control_settings:
                 self.control_settings.disable_controls()
@@ -171,6 +174,9 @@ class SystemCheckTab:
         
         # Unblock Inference and Settings navigation buttons
         self._unblock_navigation_buttons()
+        
+        # Unblock logout button
+        self._unblock_logout_button()
         
         # Unblock Control Settings pattern selection
         if self.control_settings:
@@ -229,3 +235,22 @@ class SystemCheckTab:
                     state=tk.NORMAL,
                     bg=nav_button.inactive_bg
                 )
+    
+    def _block_logout_button(self):
+        """Block the logout button during system check with grey color."""
+        if hasattr(self.app, 'logout_button') and self.app.logout_button:
+            self.app.logout_button.config(
+                state=tk.DISABLED,
+                bg="#6c757d",  # Grey
+                fg="#FFFFFF"  # White text
+            )
+    
+    def _unblock_logout_button(self):
+        """Unblock the logout button after system check with red color."""
+        if hasattr(self.app, 'logout_button') and self.app.logout_button:
+            from ..utils.styles import Colors
+            self.app.logout_button.config(
+                state=tk.NORMAL,
+                bg=Colors.DANGER,  # Red
+                fg="#FFFFFF"  # White text
+            )
