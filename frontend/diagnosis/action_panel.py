@@ -35,9 +35,9 @@ class ActionPanel:
         )
         container.pack(fill=tk.BOTH, expand=True)
         
-        # Inner frame for padding (reduced padding)
+        # Inner frame for padding (minimal padding for compact view)
         inner_frame = tk.Frame(container, bg=Colors.PRIMARY_BG)
-        inner_frame.pack(fill=tk.BOTH, padx=8, pady=5)
+        inner_frame.pack(fill=tk.BOTH, padx=6, pady=2)
         
         # Generate Report button
         generate_btn = tk.Button(
@@ -49,11 +49,10 @@ class ActionPanel:
             command=self.tab.generate_report,
             cursor="hand2",
             relief=tk.RAISED,
-            bd=2,
-            height=1,
-            pady=3
+            bd=1,
+            pady=0
         )
-        generate_btn.pack(fill=tk.X, pady=(0, 5))
+        generate_btn.pack(fill=tk.X, pady=(0, 2))
         
         # Save Chart button
         save_chart_btn = tk.Button(
@@ -65,11 +64,10 @@ class ActionPanel:
             command=self.tab.save_chart,
             cursor="hand2",
             relief=tk.RAISED,
-            bd=2,
-            height=1,
-            pady=3
+            bd=1,
+            pady=0
         )
-        save_chart_btn.pack(fill=tk.X, pady=(0, 5))
+        save_chart_btn.pack(fill=tk.X, pady=(0, 2))
         
         # Export to Excel button
         export_btn = tk.Button(
@@ -81,8 +79,28 @@ class ActionPanel:
             command=self.tab.export_to_excel,
             cursor="hand2",
             relief=tk.RAISED,
-            bd=2,
-            height=1,
-            pady=3
+            bd=1,
+            pady=0
         )
-        export_btn.pack(fill=tk.X, pady=(0, 0))
+        export_btn.pack(fill=tk.X, pady=(0, 2))
+
+        # Clear DB button (Admin and Super Admin only)
+        self.clear_db_btn = tk.Button(
+            inner_frame,
+            text="Clear DB",
+            font=Fonts.SMALL_BOLD,
+            bg="#FF6B6B",  # Light Red/Coral
+            fg="#FFFFFF",
+            command=self.tab.clear_database,
+            cursor="hand2",
+            relief=tk.RAISED,
+            bd=1,
+            pady=0
+        )
+        
+        # Check user role and show/hide button accordingly
+        if hasattr(self.tab.app, 'current_role'):
+            user_role = self.tab.app.current_role
+            if user_role in ['Admin', 'Super Admin']:
+                self.clear_db_btn.pack(fill=tk.X, pady=(0, 0))
+            # If not Admin or Super Admin, don't pack (hide) the button

@@ -313,6 +313,7 @@ def plc_communication(plc_ip, rack, slot, db_number, shared_data, command_queue)
         
     except Exception as e:
         print(f"PLC Communication: Connection error: {e} ⚠")
+        shared_data["system_error"] = True
         return
 
     try:
@@ -353,11 +354,12 @@ def plc_communication(plc_ip, rack, slot, db_number, shared_data, command_queue)
                     else:
                         print(f"PLC Communication: Unknown command: {command}")
                 except Exception as e:
+                    shared_data["system_error"] = True
                     print(f"PLC Communication: Error handling command: {e} ⚠")
 
 
     except KeyboardInterrupt:
-
+        shared_data["system_error"] = True
         data = plc_client.read_area(Areas.DB, db_number, 0, 2)  
         set_bool(data, byte_index=1, bool_index=6, value=False)  
         set_bool(data, byte_index=1, bool_index=7, value=False)  
@@ -411,14 +413,10 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
     """Process frames for YOLO inference."""
     set_priority_high()
 
-    detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\BF\\Defect"
+    detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\BF\\Defect\\{datetime.now().strftime('%d_%B_%Y_%H_%M')}"
     os.makedirs(detected_folder, exist_ok=True)
-    head_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\BF\\Head_Defect"
+    head_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\BF\\Head_Defect\\{datetime.now().strftime('%d_%B_%Y_%H_%M')}"
     os.makedirs(head_folder, exist_ok=True)
-    allow_all_folder_bf = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\BF\\All_BF"
-    os.makedirs(allow_all_folder_bf, exist_ok=True)
-    allow_all_folder_head = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\BF\\All_Head"
-    os.makedirs(allow_all_folder_head, exist_ok=True)
     
     bf_triggered = False
     roller_dict = {}
@@ -506,8 +504,18 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
     shared_data["bf_down_head"] = 0
     shared_data["bf_others"] = 0
 
-    allow_all = shared_data.get("allow_all", False)    
+    allow_all = shared_data.get("allow_all", False)  
+    if allow_all:
+        allow_all_folder_bf = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\BF\\All_BF\\{datetime.now().strftime('%d_%B_%Y_%H_%M')}"
+        os.makedirs(allow_all_folder_bf, exist_ok=True)
+        allow_all_folder_head = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\BF\\All_Head\\{datetime.now().strftime('%d_%B_%Y_%H_%M')}"
+        os.makedirs(allow_all_folder_head, exist_ok=True) 
     
+    bf_file_counter = 0
+    head_file_counter = 0
+    bf_all_file_counter = 0
+    head_all_file_counter = 0
+
     try:
         while True:
             
@@ -572,11 +580,13 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
                     cv2.putText(annotated_frame, distance_text, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
                     
                     annotated_frame = results[0].plot()
-                    save_path = f"{head_folder}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                    head_file_counter += 1
+                    save_path = f"{head_folder}/{head_file_counter}.jpg"
                     cv2.imwrite(save_path, annotated_frame)
 
                     if allow_all:
-                        allow_all_path = f"{allow_all_folder_head}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                        head_all_file_counter += 1
+                        allow_all_path = f"{allow_all_folder_head}/{head_all_file_counter}.jpg"
                         cv2.imwrite(allow_all_path, annotated_frame)
         
 
@@ -616,10 +626,12 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
                 has_defect_detection = any(detection[0] != "roller" for detection in detections)
 
                 if allow_all and has_roller_detection:
-                    allow_all_path = f"{allow_all_folder_bf}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                    bf_all_file_counter += 1
+                    allow_all_path = f"{allow_all_folder_bf}/{bf_all_file_counter}.jpg"
                     cv2.imwrite(allow_all_path, annotated_frame)            
                 if has_roller_detection and has_defect_detection:
-                    save_path = f"{detected_folder}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                    bf_file_counter += 1
+                    save_path = f"{detected_folder}/{bf_file_counter}.jpg"
                     cv2.imwrite(save_path, annotated_frame)
 
                 with annotated_frame_lock_bigface:
@@ -747,10 +759,8 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
     """Process frames for YOLO inference and track roller defects with pulse debounce & proper exit handling."""
     set_priority_high()
 
-    detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\OD\\Defect"
+    detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\OD\\Defect\\{datetime.now().strftime('%d_%B_%Y_%H_%M')}"
     os.makedirs(detected_folder, exist_ok=True)
-    allow_all_folder_od = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\OD\\All_OD"
-    os.makedirs(allow_all_folder_od, exist_ok=True)
 
     def point_inside(rectangle, list_of_all_rollers , roller_number): #COORDINATES, NO OF ROLLERS IN FRAME, TOTAL ROLLERS
         
@@ -802,10 +812,16 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
     shared_data["od_others"] = 0
 
     allow_all = shared_data.get("allow_all", False)
+    if allow_all:
+        allow_all_folder_od = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\OD\\All_OD\\{datetime.now().strftime('%d_%B_%Y_%H_%M')}"
+        os.makedirs(allow_all_folder_od, exist_ok=True)
 
     # Load thresholds from database
     defect_thresholds = get_thresholds_for_model(model_od_path, 'od')
     model_conf_threshold = get_model_confidence_threshold(model_od_path, 'od')
+
+    od_file_counter = 0
+    od_all_file_counter = 0
     
     try:
         while True:
@@ -848,10 +864,12 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
                 has_defect_detection = any(detection[0] != "roller" for detection in detections)
 
                 if allow_all and has_roller_detection:
-                    allow_all_path = f"{allow_all_folder_od}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                    od_all_file_counter += 1
+                    allow_all_path = f"{allow_all_folder_od}/{od_all_file_counter}.jpg"
                     cv2.imwrite(allow_all_path, annotated_frame)
                 if has_roller_detection and has_defect_detection:
-                    save_path = f"{detected_folder}/{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}.jpg"
+                    od_file_counter += 1
+                    save_path = f"{detected_folder}/{od_file_counter}.jpg"
                     cv2.imwrite(save_path, annotated_frame)
 
                 with annotated_frame_lock_od:

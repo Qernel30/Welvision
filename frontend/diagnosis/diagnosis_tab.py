@@ -281,6 +281,144 @@ class DiagnosisTab:
             traceback.print_exc()
             messagebox.showerror("Export Error", f"Failed to export report:\n{str(e)}")
     
+    def clear_database(self):
+        """Clear database entries for the applied filters (Admin and Super Admin only)."""
+        from tkinter import messagebox
+        
+        # Double-check user role for security
+        if not hasattr(self.app, 'current_role') or self.app.current_role not in ['Admin', 'Super Admin']:
+            messagebox.showerror(
+                "Access Denied",
+                "⛔ You do not have permission to clear database entries.\n\n"
+                "This action is restricted to Admin and Super Admin users only."
+            )
+            return
+        
+        # Get filters
+        filters = self.control_panel.get_filters()
+        if not filters:  # Validation failed
+            return
+        
+        component_type = filters['component_type']
+        report_type = filters['report_type']
+        from_date = filters['from_date']
+        to_date = filters['to_date']
+        
+        # Confirmation dialog with detailed information
+        confirm_message = (
+            f"⚠️ WARNING: Database Deletion\n\n"
+            f"You are about to permanently delete data from the database:\n\n"
+            f"Report Type: {report_type}\n"
+            f"Component Type: {component_type}\n"
+            f"Date Range: {from_date} to {to_date}\n\n"
+            f"This action CANNOT be undone!\n\n"
+            f"Are you sure you want to continue?"
+        )
+        
+        response = messagebox.askyesno(
+            "Confirm Database Deletion",
+            confirm_message,
+            icon='warning'
+        )
+        
+        if not response:
+            return  # User cancelled
+        
+        # Second confirmation for extra safety
+        final_confirm = messagebox.askyesno(
+            "Final Confirmation",
+            "⚠️ LAST WARNING ⚠️\n\n"
+            "This will permanently delete the selected data.\n\n"
+            "Click YES to proceed with deletion.\n"
+            "Click NO to cancel.",
+            icon='warning'
+        )
+        
+        if not final_confirm:
+            return  # User cancelled
+        
+        # Proceed with deletion
+        try:
+            import mysql.connector
+            
+            connection = mysql.connector.connect(
+                host=AppConfig.DB_HOST,
+                user=AppConfig.DB_USER,
+                password=AppConfig.DB_PASSWORD,
+                database=AppConfig.DB_DATABASE
+            )
+            
+            cursor = connection.cursor()
+            
+            deleted_count = 0
+            
+            if report_type == 'BF':
+                # Delete from BF table only
+                delete_query = """
+                    DELETE FROM bf_roller_tracking
+                    WHERE roller_type = %s AND report_date BETWEEN %s AND %s
+                """
+                cursor.execute(delete_query, (component_type, from_date, to_date))
+                deleted_count = cursor.rowcount
+                
+            elif report_type == 'OD':
+                # Delete from OD table only
+                delete_query = """
+                    DELETE FROM od_roller_tracking
+                    WHERE roller_type = %s AND report_date BETWEEN %s AND %s
+                """
+                cursor.execute(delete_query, (component_type, from_date, to_date))
+                deleted_count = cursor.rowcount
+                
+            else:  # Overall - delete from both tables
+                # Delete from BF table
+                bf_delete_query = """
+                    DELETE FROM bf_roller_tracking
+                    WHERE roller_type = %s AND report_date BETWEEN %s AND %s
+                """
+                cursor.execute(bf_delete_query, (component_type, from_date, to_date))
+                bf_count = cursor.rowcount
+                
+                # Delete from OD table
+                od_delete_query = """
+                    DELETE FROM od_roller_tracking
+                    WHERE roller_type = %s AND report_date BETWEEN %s AND %s
+                """
+                cursor.execute(od_delete_query, (component_type, from_date, to_date))
+                od_count = cursor.rowcount
+                
+                deleted_count = bf_count + od_count
+            
+            # Commit the transaction
+            connection.commit()
+            
+            cursor.close()
+            connection.close()
+            
+            # Show success message
+            messagebox.showinfo(
+                "Database Cleared",
+                f"✅ Successfully deleted {deleted_count} record(s) from database.\n\n"
+                f"Report Type: {report_type}\n"
+                f"Component Type: {component_type}\n"
+                f"Date Range: {from_date} to {to_date}"
+            )
+            
+            # Clear current data and refresh the view
+            self.current_data = []
+            if self.report_data_table:
+                self.report_data_table.update_data([], report_type)
+            
+            # Clear charts
+            self._update_charts([], report_type)
+            
+        except Exception as e:
+            print(f"❌ Error clearing database: {e}")
+            import traceback
+            traceback.print_exc()
+            DatabaseErrorHandler.handle_db_error(e, self.parent, "clearing database entries")
+    
+    
     def _fetch_and_display_data(self, filters):
         """
         Fetch data from database and display in table and charts.
