@@ -29,7 +29,7 @@ class ModelActions:
         """Create the action buttons UI."""
         # Actions frame
         actions_frame = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
-        actions_frame.pack(fill=tk.X, pady=(10, 0))
+        actions_frame.pack(fill=tk.X, pady=(5, 5))
         
         # Info label (left)
         info_label = tk.Label(
@@ -40,16 +40,6 @@ class ModelActions:
             bg=Colors.PRIMARY_BG
         )
         info_label.pack(side=tk.LEFT, padx=5)
-        
-        # Status label (center)
-        self.status_label = tk.Label(
-            actions_frame,
-            text="Ready",
-            font=Fonts.TEXT_BOLD,
-            fg="#00ff00",
-            bg=Colors.PRIMARY_BG
-        )
-        self.status_label.pack(side=tk.LEFT, expand=True)
         
         # Delete Model button (right)
         delete_button = tk.Button(
@@ -62,8 +52,8 @@ class ModelActions:
             cursor="hand2",
             relief=tk.RAISED,
             bd=2,
-            padx=30,
-            pady=8
+            padx=25,
+            pady=5
         )
         delete_button.pack(side=tk.RIGHT, padx=5)
     
@@ -111,21 +101,17 @@ class ModelActions:
                     
                     # Refresh table
                     self.tab.refresh_models()
-                    self.status_label.config(text="Model deleted", fg="#00ff00")
                     
                     # Reload models in app and notify other tabs
                     if hasattr(self.tab, 'app'):
                         self.tab.app.reload_models_and_notify_tabs()
                 else:
                     messagebox.showerror("Error", "Failed to delete model from database!")
-                    self.status_label.config(text="Delete failed", fg="#ff0000")
             else:
                 messagebox.showerror("Error", "Failed to connect to database!")
-                self.status_label.config(text="Database error", fg="#ff0000")
                 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to delete model:\n{str(e)}")
-            self.status_label.config(text="Error", fg="#ff0000")
             print(f"❌ Delete error: {e}")
             import traceback
             traceback.print_exc()

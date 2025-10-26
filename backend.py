@@ -319,51 +319,45 @@ def plc_communication(plc_ip, rack, slot, db_number, shared_data, command_queue)
     try:
         plc_client.connect(plc_ip, rack, slot)
         while True:
-            try:
-                data = plc_client.read_area(Areas.DB, db_number, 0, 3)
+            data = plc_client.read_area(Areas.DB, db_number, 0, 3)
 
-                # shared_data['bigface_presence'] = get_bool(data, byte_index=0, bool_index=1)
-                # shared_data['od_presence'] = get_bool(data, byte_index=1, bool_index=4)
-                # shared_data['bigface'] = get_bool(data, byte_index=0, bool_index=1)
-                # shared_data['od'] = get_bool(data, byte_index=0, bool_index=2)
-                # shared_data['head_classification'] = get_bool(data, byte_index=2, bool_index=2)
+            # shared_data['bigface_presence'] = get_bool(data, byte_index=0, bool_index=1)
+            # shared_data['od_presence'] = get_bool(data, byte_index=1, bool_index=4)
+            # shared_data['bigface'] = get_bool(data, byte_index=0, bool_index=1)
+            # shared_data['od'] = get_bool(data, byte_index=0, bool_index=2)
+            # shared_data['head_classification'] = get_bool(data, byte_index=2, bool_index=2)
 
-                shared_data['bigface_presence'] = get_bool(data, 0, 1)
-                shared_data['bigface'] = get_bool(data, 0, 2)
-                shared_data['od'] = get_bool(data, 0, 0)
-                shared_data['od_presence'] = get_bool(data, 1, 4)
-                shared_data['head_classification'] = get_bool(data, 2, 2)
-                shared_data['system_mode'] = get_bool(data, 2, 0)
-                shared_data['disc_status'] = get_bool(data, 2, 1)
-                shared_data['system_ready'] = get_bool(data, 1, 6)
-
-            except Exception as e:
-                print(f"PLC Communication: Error reading sensors: {e} ⚠")
+            shared_data['bigface_presence'] = get_bool(data, 0, 1)
+            shared_data['bigface'] = get_bool(data, 0, 2)
+            shared_data['od'] = get_bool(data, 0, 0)
+            shared_data['od_presence'] = get_bool(data, 1, 4)
+            shared_data['head_classification'] = get_bool(data, 2, 2)
+            shared_data['system_mode'] = get_bool(data, 2, 0)
+            shared_data['disc_status'] = get_bool(data, 2, 1)
+            shared_data['system_ready'] = get_bool(data, 1, 6)
 
             while not command_queue.empty():
-                try:
-                    command, _ = command_queue.get_nowait()
-                    if command == 'accept_bigface':
-                        trigger_plc_action(plc_client, db_number, byte_index=1, bool_index=0, action="accept")
-                    elif command == 'reject_bigface':
-                        trigger_plc_action(plc_client, db_number, byte_index=1, bool_index=1, action="reject")
-                    elif command == 'accept_od':
-                        trigger_plc_action(plc_client, db_number, byte_index=1, bool_index=2, action="accept")
-                    elif command == 'reject_od':
-                        trigger_plc_action(plc_client, db_number, byte_index=1, bool_index=3, action="reject")
-                    else:
-                        print(f"PLC Communication: Unknown command: {command}")
-                except Exception as e:
-                    shared_data["system_error"] = True
-                    print(f"PLC Communication: Error handling command: {e} ⚠")
-
+                command, _ = command_queue.get_nowait()
+                if command == 'accept_bigface':
+                    trigger_plc_action(plc_client, db_number, byte_index=1, bool_index=0, action="accept")
+                elif command == 'reject_bigface':
+                    trigger_plc_action(plc_client, db_number, byte_index=1, bool_index=1, action="reject")
+                elif command == 'accept_od':
+                    trigger_plc_action(plc_client, db_number, byte_index=1, bool_index=2, action="accept")
+                elif command == 'reject_od':
+                    trigger_plc_action(plc_client, db_number, byte_index=1, bool_index=3, action="reject")
+                else:
+                    print(f"PLC Communication: Unknown command: {command}")
 
     except KeyboardInterrupt:
-        shared_data["system_error"] = True
         data = plc_client.read_area(Areas.DB, db_number, 0, 2)  
         set_bool(data, byte_index=1, bool_index=6, value=False)  
         set_bool(data, byte_index=1, bool_index=7, value=False)  
         plc_client.write_area(Areas.DB, db_number, 0, data)
+
+    except Exception as e:
+        print(f"PLC Communication: Error during operation: {e} ⚠")
+        shared_data["system_error"] = True
 
     finally:
         plc_client.disconnect()
@@ -384,7 +378,7 @@ def trigger_plc_action(plc_client, db_number, byte_index, bool_index, action):
     except Exception as e:
         print(f"⚠ PLC Action: Error triggering {action.upper()} slot: {e}")
 
-def capture_frames_bigface(shared_frame_bigface, frame_lock_bigface,frame_shape):
+def capture_frames_bigface(shared_frame_bigface, frame_lock_bigface, frame_shape, shared_data):
     """Continuously capture frames from the camera."""
     set_priority_above_normal()
 
@@ -396,17 +390,21 @@ def capture_frames_bigface(shared_frame_bigface, frame_lock_bigface,frame_shape)
         print("Failed to open camera.")
         sys.exit(1)
 
-    while True:
-        ret, frame = cap.read()
-        if ret:
-            with frame_lock_bigface:
-                np_frame = np.frombuffer(shared_frame_bigface.get_obj(), dtype=np.uint8).reshape(frame_shape)
-                np.copyto(np_frame, frame)
-        else:
-            print("Failed to capture frame.")
-            time.sleep(0.1)
+    try:
+        while True:
+            ret, frame = cap.read()
+            if ret:
+                with frame_lock_bigface:
+                    np_frame = np.frombuffer(shared_frame_bigface.get_obj(), dtype=np.uint8).reshape(frame_shape)
+                    np.copyto(np_frame, frame)
+            else:
+                print("Failed to capture frame.")
+                shared_data["system_error"] = True
+                time.sleep(0.1)
+    except Exception as e:
+        print(f"Camera capture error: {e}")
+        shared_data["system_error"] = True
 
-    cap.release()
 
         
 def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_queue_bigface, model_bigface_path, proximity_count_bigface, roller_updation_dict, queue_lock, shared_data, frame_shape, shared_annotated_bigface, annotated_frame_lock_bigface):
@@ -721,19 +719,23 @@ def handle_slot_control_bigface(roller_queue_bigface,shared_data,command_queue):
 
     global roller_number
 
-    a = False
-    while True:
-        if shared_data["bigface"] and not a:
-            a = True
-            if not roller_queue_bigface.empty():
-                defect_detected = roller_queue_bigface.get()
-                status = "Defective" if defect_detected else "Good"
-                command_queue.put(("accept_bigface" if not defect_detected else "reject_bigface", None))
-        elif not shared_data["bigface"]:
-            a = False
+    try:
+        a = False
+        while True:
+            if shared_data["bigface"] and not a:
+                a = True
+                if not roller_queue_bigface.empty():
+                    defect_detected = roller_queue_bigface.get()
+                    status = "Defective" if defect_detected else "Good"
+                    command_queue.put(("accept_bigface" if not defect_detected else "reject_bigface", None))
+            elif not shared_data["bigface"]:
+                a = False
+    except Exception as e:
+        print(f"Slot Control Error: {e}")
+        shared_data["system_error"] = True
 
-def capture_frames_od(shared_frame_od, frame_lock_od,frame_shape):
-    """Continuously captureframes from the camera."""
+def capture_frames_od(shared_frame_od, frame_lock_od, frame_shape, shared_data):
+    """Continuously capture frames from the camera."""
     set_priority_above_normal()
     
     cap = cv2.VideoCapture(1)
@@ -744,16 +746,21 @@ def capture_frames_od(shared_frame_od, frame_lock_od,frame_shape):
         print("Failed to open camera.")
         return
 
-    while True:
-        ret, frame = cap.read()
-        if ret:
-            frame = cv2.flip(frame, -1)
-            with frame_lock_od:
-                np_frame = np.frombuffer(shared_frame_od.get_obj(), dtype=np.uint8).reshape(frame_shape)
-                np.copyto(np_frame, frame)
-        else:
-            print("Failed to capture frame.")
-            time.sleep(0.01)
+    try:
+        while True:
+            ret, frame = cap.read()
+            if ret:
+                frame = cv2.flip(frame, -1)
+                with frame_lock_od:
+                    np_frame = np.frombuffer(shared_frame_od.get_obj(), dtype=np.uint8).reshape(frame_shape)
+                    np.copyto(np_frame, frame)
+            else:
+                print("Failed to capture frame.")
+                shared_data["system_error"] = True
+                time.sleep(0.01)
+    except Exception as e:
+        print(f"Camera capture error: {e}")
+        shared_data["system_error"] = True
 
 def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_path, queue_lock, shared_data, frame_shape, roller_updation_dict,shared_annotated_od, annotated_frame_lock_od):
     """Process frames for YOLO inference and track roller defects with pulse debounce & proper exit handling."""
@@ -950,17 +957,20 @@ def handle_slot_control_od(roller_queue_od, shared_data, command_queue):
     """Control slot mechanism based on second proximity sensor."""
     set_priority_below_normal()
 
-    processing = False
-    while True:
-        if shared_data["od"] and not processing and not roller_queue_od.empty():
-            processing = True
-            if not roller_queue_od.empty():
-                defect_detected = roller_queue_od.get()
-                status = "❌ Defective" if defect_detected else "✅ Good"
-                command_queue.put(("reject_od" if defect_detected else "accept_od" , None))
+    try:
+        processing = False
+        while True:
+            if shared_data["od"] and not processing and not roller_queue_od.empty():
+                processing = True
+                if not roller_queue_od.empty():
+                    defect_detected = roller_queue_od.get()
+                    status = "❌ Defective" if defect_detected else "✅ Good"
+                    command_queue.put(("reject_od" if defect_detected else "accept_od" , None))
 
-            queue_size = roller_queue_od.qsize()
+                queue_size = roller_queue_od.qsize()
 
-        elif not shared_data["od"]:
-            processing = False
-            
+            elif not shared_data["od"]:
+                processing = False
+    except Exception as e:
+        print(f"Slot Control Error: {e}")
+        shared_data["system_error"] = True    

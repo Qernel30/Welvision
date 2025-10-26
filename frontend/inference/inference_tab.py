@@ -105,6 +105,9 @@ class InferenceTab:
             except Exception as e:
                 # Handle exceptions and exit gracefully
                 print(f"OD camera thread error: {e}")
+                # Set system error flag
+                if hasattr(self.app, 'shared_data') and self.app.shared_data:
+                    self.app.shared_data['system_error'] = True
                 break
 
     def update_bf_camera(self):
@@ -142,6 +145,9 @@ class InferenceTab:
             except Exception as e:
                 # Handle exceptions and exit gracefully
                 print(f"BF camera thread error: {e}")
+                # Set system error flag
+                if hasattr(self.app, 'shared_data') and self.app.shared_data:
+                    self.app.shared_data['system_error'] = True
                 break
     
     def start_camera_threads(self):

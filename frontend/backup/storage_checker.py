@@ -1,0 +1,64 @@
+"""
+Storage Checker Utility
+Checks available storage space before copying
+"""
+
+import psutil
+from tkinter import messagebox
+
+
+class StorageChecker:
+    """Static methods for storage space checking."""
+    
+    @staticmethod
+    def check_storage_space(dest_path, required_size):
+        """
+        Check if destination has enough storage space.
+        
+        Args:
+            dest_path: Destination folder path
+            required_size: Required size in bytes
+            
+        Returns:
+            bool: True if enough space or user confirms, False otherwise
+        """
+        try:
+            # Get disk usage statistics
+            disk_usage = psutil.disk_usage(dest_path)
+            
+            available_space = disk_usage.free
+            required_mb = required_size / (1024 * 1024)
+            available_mb = available_space / (1024 * 1024)
+            available_gb = available_space / (1024 * 1024 * 1024)
+            
+            # Check if sufficient space (with 10% safety margin)
+            if available_space < (required_size * 1.1):
+                messagebox.showerror(
+                    "Insufficient Storage",
+                    f"❌ Not enough storage space!\n\n"
+                    f"Required: {required_mb:.2f} MB\n"
+                    f"Available: {available_mb:.2f} MB ({available_gb:.2f} GB)\n\n"
+                    f"Please free up space or select a different destination."
+                )
+                return False
+            
+            # Show storage info
+            messagebox.showinfo(
+                "Storage Check",
+                f"✅ Storage Check Passed\n\n"
+                f"Required: {required_mb:.2f} MB\n"
+                f"Available: {available_mb:.2f} MB ({available_gb:.2f} GB)\n"
+                f"After copy: {(available_space - required_size) / (1024**3):.2f} GB remaining"
+            )
+            
+            return True
+        
+        except Exception as e:
+            print(f"Error checking storage: {e}")
+            # If we can't check, ask user to proceed
+            return messagebox.askyesno(
+                "Storage Check Failed",
+                f"⚠️ Unable to check storage space.\n\n"
+                f"Error: {str(e)}\n\n"
+                f"Do you want to proceed anyway?"
+            )

@@ -126,13 +126,17 @@ class SystemCheckTab:
             if self.processing_counters:
                 self.processing_counters.update_counters(self.app.shared_data)
         
-        # Continue monitoring every 500ms
-        self.parent.after(500, self._monitor_updates)
+        # Continue monitoring every 100ms for faster sensor status updates
+        self.parent.after(100, self._monitor_updates)
     
     def start_system(self):
         """Start the system check control."""
         if self.system_running:
             print("⚠ System Check: Already running")
+            return False
+        
+        # Check PLC connection before starting
+        if not self._check_plc_connection():
             return False
         
         # Start PLC monitoring
@@ -155,6 +159,10 @@ class SystemCheckTab:
             # Update button states
             if self.system_control:
                 self.system_control.enable_stop()
+            
+            # Start monitoring for system errors
+            if hasattr(self.app, '_monitor_system_error'):
+                self.app._monitor_system_error()
             
             return True
         else:
@@ -254,3 +262,49 @@ class SystemCheckTab:
                 bg=Colors.DANGER,  # Red
                 fg="#FFFFFF"  # White text
             )
+    
+    def _check_plc_connection(self):
+        """
+        Check PLC connection before starting system check.
+        
+        Returns:
+            bool: True if PLC is connected, False otherwise
+        """
+        try:
+            import snap7
+            from tkinter import messagebox
+            from ..utils.config import AppConfig
+            
+            plc = snap7.client.Client()
+            plc.connect(AppConfig.PLC_IP, AppConfig.PLC_RACK, AppConfig.PLC_SLOT)
+            
+            if plc.get_connected():
+                plc.disconnect()
+                return True
+            else:
+                messagebox.showerror(
+                    "PLC Not Connected",
+                    f"⚠️ Cannot connect to PLC at {AppConfig.PLC_IP}\n\n"
+                    "Please check:\n"
+                    "• PLC is powered on\n"
+                    "• Network cable is connected\n"
+                    "• IP address is correct\n\n"
+                    "System Check cannot start without PLC connection."
+                )
+                return False
+        
+        except Exception as e:
+            from tkinter import messagebox
+            from ..utils.config import AppConfig
+            messagebox.showerror(
+                "PLC Connection Failed",
+                f"⚠️ PLC Connection Error\n\n"
+                f"IP: {AppConfig.PLC_IP}\n"
+                f"Error: {str(e)}\n\n"
+                "Please check:\n"
+                "• PLC is powered on\n"
+                "• Network cable is connected\n"
+                "• Firewall settings\n\n"
+                "System Check cannot start without PLC connection."
+            )
+            return False

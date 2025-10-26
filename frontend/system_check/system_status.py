@@ -26,8 +26,10 @@ class SystemStatus:
         # Status labels
         self.system_status_label = None
         self.system_message_label = None
-        self.bf_sensor_label = None
-        self.od_sensor_label = None
+        self.bf_presence_sensor_label = None
+        self.bf_accept_sensor_label = None
+        self.od_presence_sensor_label = None
+        self.od_accept_sensor_label = None
         
     def create(self):
         """Create the system status UI."""
@@ -121,53 +123,101 @@ class SystemStatus:
         )
         title_label.pack(anchor="w", pady=(0, 5))
         
-        # BigFace sensor
-        bf_frame = tk.Frame(sensor_container, bg=Colors.PRIMARY_BG)
-        bf_frame.pack(anchor="w", pady=5)
+        # BigFace Presence sensor
+        bf_presence_frame = tk.Frame(sensor_container, bg=Colors.PRIMARY_BG)
+        bf_presence_frame.pack(anchor="w", pady=3)
         
-        bf_label = tk.Label(
-            bf_frame,
-            text="BigFace:",
+        bf_presence_label = tk.Label(
+            bf_presence_frame,
+            text="BF Presence:",
             font=("Arial", 9),
             fg=Colors.WHITE,
             bg=Colors.PRIMARY_BG,
-            width=10,
+            width=15,
             anchor="w"
         )
-        bf_label.pack(side=tk.LEFT)
+        bf_presence_label.pack(side=tk.LEFT)
         
-        self.bf_sensor_label = tk.Label(
-            bf_frame,
+        self.bf_presence_sensor_label = tk.Label(
+            bf_presence_frame,
             text="OFF",
             font=("Arial", 9, "bold"),
             fg="#888888",
             bg=Colors.PRIMARY_BG
         )
-        self.bf_sensor_label.pack(side=tk.LEFT)
+        self.bf_presence_sensor_label.pack(side=tk.LEFT)
         
-        # OD sensor
-        od_frame = tk.Frame(sensor_container, bg=Colors.PRIMARY_BG)
-        od_frame.pack(anchor="w", pady=5)
+        # BigFace Accept/Reject sensor
+        bf_accept_frame = tk.Frame(sensor_container, bg=Colors.PRIMARY_BG)
+        bf_accept_frame.pack(anchor="w", pady=3)
         
-        od_label = tk.Label(
-            od_frame,
-            text="OD:",
+        bf_accept_label = tk.Label(
+            bf_accept_frame,
+            text="BF Accept/Reject:",
             font=("Arial", 9),
             fg=Colors.WHITE,
             bg=Colors.PRIMARY_BG,
-            width=10,
+            width=15,
             anchor="w"
         )
-        od_label.pack(side=tk.LEFT)
+        bf_accept_label.pack(side=tk.LEFT)
         
-        self.od_sensor_label = tk.Label(
-            od_frame,
+        self.bf_accept_sensor_label = tk.Label(
+            bf_accept_frame,
             text="OFF",
             font=("Arial", 9, "bold"),
             fg="#888888",
             bg=Colors.PRIMARY_BG
         )
-        self.od_sensor_label.pack(side=tk.LEFT)
+        self.bf_accept_sensor_label.pack(side=tk.LEFT)
+        
+        # OD Presence sensor
+        od_presence_frame = tk.Frame(sensor_container, bg=Colors.PRIMARY_BG)
+        od_presence_frame.pack(anchor="w", pady=3)
+        
+        od_presence_label = tk.Label(
+            od_presence_frame,
+            text="OD Presence:",
+            font=("Arial", 9),
+            fg=Colors.WHITE,
+            bg=Colors.PRIMARY_BG,
+            width=15,
+            anchor="w"
+        )
+        od_presence_label.pack(side=tk.LEFT)
+        
+        self.od_presence_sensor_label = tk.Label(
+            od_presence_frame,
+            text="OFF",
+            font=("Arial", 9, "bold"),
+            fg="#888888",
+            bg=Colors.PRIMARY_BG
+        )
+        self.od_presence_sensor_label.pack(side=tk.LEFT)
+        
+        # OD Accept/Reject sensor
+        od_accept_frame = tk.Frame(sensor_container, bg=Colors.PRIMARY_BG)
+        od_accept_frame.pack(anchor="w", pady=3)
+        
+        od_accept_label = tk.Label(
+            od_accept_frame,
+            text="OD Accept/Reject:",
+            font=("Arial", 9),
+            fg=Colors.WHITE,
+            bg=Colors.PRIMARY_BG,
+            width=15,
+            anchor="w"
+        )
+        od_accept_label.pack(side=tk.LEFT)
+        
+        self.od_accept_sensor_label = tk.Label(
+            od_accept_frame,
+            text="OFF",
+            font=("Arial", 9, "bold"),
+            fg="#888888",
+            bg=Colors.PRIMARY_BG
+        )
+        self.od_accept_sensor_label.pack(side=tk.LEFT)
     
     def update_status(self, shared_data, system_running):
         """
@@ -192,15 +242,38 @@ class SystemStatus:
             )
         
         # Update sensor status
+        # BF Presence - Byte 0, Bit 1
         bf_presence = shared_data.get('bigface_presence', False)
+        
+        # BF Accept/Reject - Byte 0, Bit 2
+        bf_accept_reject = shared_data.get('bigface', False)
+        
+        # OD Presence - Byte 1, Bit 4
         od_presence = shared_data.get('od_presence', False)
         
-        if bf_presence:
-            self.bf_sensor_label.config(text="ON", fg="#00FF00")
-        else:
-            self.bf_sensor_label.config(text="OFF", fg="#888888")
+        # OD Accept/Reject - Byte 0, Bit 0
+        od_accept_reject = shared_data.get('od', False)
         
-        if od_presence:
-            self.od_sensor_label.config(text="ON", fg="#00FF00")
+        # Update BF Presence
+        if bf_presence:
+            self.bf_presence_sensor_label.config(text="ON", fg="#00FF00")
         else:
-            self.od_sensor_label.config(text="OFF", fg="#888888")
+            self.bf_presence_sensor_label.config(text="OFF", fg="#888888")
+        
+        # Update BF Accept/Reject
+        if bf_accept_reject:
+            self.bf_accept_sensor_label.config(text="ON", fg="#00FF00")
+        else:
+            self.bf_accept_sensor_label.config(text="OFF", fg="#888888")
+        
+        # Update OD Presence
+        if od_presence:
+            self.od_presence_sensor_label.config(text="ON", fg="#00FF00")
+        else:
+            self.od_presence_sensor_label.config(text="OFF", fg="#888888")
+        
+        # Update OD Accept/Reject
+        if od_accept_reject:
+            self.od_accept_sensor_label.config(text="ON", fg="#00FF00")
+        else:
+            self.od_accept_sensor_label.config(text="OFF", fg="#888888")

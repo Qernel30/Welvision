@@ -97,7 +97,7 @@ class ModelsTable:
             show="headings",
             yscrollcommand=vsb.set,
             xscrollcommand=hsb.set,
-            height=15
+            height=8  # Reduced from 15 to 8 for better visibility
         )
         
         vsb.config(command=self.tree.yview)

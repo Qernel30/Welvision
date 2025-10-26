@@ -17,6 +17,7 @@ class NavConfig:
         ("model_management", "MODEL MANAGEMENT", "Model Management"),
         ("user_management", "USER MANAGEMENT", "User Management"),
         ("system_check", "SYSTEM CHECK", "System Check"),
+        ("backup", "BACKUP", "Backup"),
         ("info", "INFO", "Info"),
     ]
     

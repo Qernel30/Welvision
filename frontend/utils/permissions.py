@@ -113,6 +113,20 @@ class Permissions:
         return role in ["Admin", "Super Admin"]
     
     @staticmethod
+    def can_access_backup_tab(role):
+        """
+        Check if user can access Backup tab.
+        Only Admin and Super Admin can access this tab.
+        
+        Args:
+            role (str): User role
+            
+        Returns:
+            bool: True if user has permission, False otherwise
+        """
+        return role in ["Admin", "Super Admin"]
+    
+    @staticmethod
     def can_start_stop_inspection(role):
         """
         Check if user can start/stop inspection.

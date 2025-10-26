@@ -26,6 +26,7 @@ from .diagnosis import DiagnosisTab
 from .system_check import SystemCheckTab
 from .data import DataTab
 from .user_management import UserManagementTab
+from .backup import BackupTab
 from backend import (
     plc_communication,
     capture_frames_bigface,
@@ -126,6 +127,7 @@ class WelVisionApp(tk.Tk):
         self.system_check_tab = None
         self.data_tab = None
         self.user_management_tab = None
+        self.backup_tab = None
         
         # Content frame reference
         self.content_frame = None
@@ -282,19 +284,20 @@ class WelVisionApp(tk.Tk):
         if hasattr(self, 'footer_frame') and self.footer_frame:
             self.footer_frame.destroy()
         
-        # Create footer frame
-        self.footer_frame = tk.Frame(self, bg=Colors.PRIMARY_BG)
-        self.footer_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(5, 5))
+        # Create footer frame with higher priority (pack at bottom)
+        self.footer_frame = tk.Frame(self, bg=Colors.SECONDARY_BG, height=40)
+        self.footer_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=0)
+        self.footer_frame.pack_propagate(False)  # Maintain fixed height
         
-        # Create company label with larger font
+        # Create company label centered in footer
         company_label = tk.Label(
             self.footer_frame,
-            text="Developed and Maintained by \n© Welvision Pvt Limited",
-            font=Fonts.TEXT_BOLD,  # Using TEXT_BOLD font for larger size
+            text="Developed and Maintained by © Welvision Pvt Limited",
+            font=Fonts.TEXT_BOLD,
             fg="#FFFFFF",
-            bg=Colors.PRIMARY_BG
+            bg=Colors.SECONDARY_BG
         )
-        company_label.pack(side=tk.RIGHT, padx=20)
+        company_label.pack(expand=True, pady=8)
     
     def on_login_success(self, email, role):
         """
@@ -317,6 +320,9 @@ class WelVisionApp(tk.Tk):
         for widget in self.winfo_children():
             widget.destroy()
         
+        # Add global footer first (at bottom of window)
+        self._create_global_footer()
+        
         # Create main frame
         main_frame = tk.Frame(self, bg=Colors.PRIMARY_BG)
         main_frame.pack(fill=tk.BOTH, expand=True)
@@ -337,9 +343,6 @@ class WelVisionApp(tk.Tk):
         # Create content frame for tabs
         self.content_frame = tk.Frame(main_frame, bg=Colors.PRIMARY_BG)
         self.content_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        # Add global footer
-        self._create_global_footer()
         
         # Set window close protocol handler
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -466,7 +469,7 @@ class WelVisionApp(tk.Tk):
         self.processes = [
             Process(
                 target=capture_frames_bigface, 
-                args=(self.shared_frame_bigface, self.frame_lock_bigface, self.frame_shape), 
+                args=(self.shared_frame_bigface, self.frame_lock_bigface, self.frame_shape, self.shared_data), 
                 daemon=True
             ),
             Process(
@@ -509,7 +512,7 @@ class WelVisionApp(tk.Tk):
             ),
             Process(
                 target=capture_frames_od, 
-                args=(self.shared_frame_od, self.frame_lock_od, self.frame_shape), 
+                args=(self.shared_frame_od, self.frame_lock_od, self.frame_shape, self.shared_data), 
                 daemon=True
             ),
             Process(
@@ -681,6 +684,10 @@ class WelVisionApp(tk.Tk):
             self.system_check_tab = SystemCheckTab(self.current_tab_frame, self)
             self.system_check_tab.setup()
         
+        elif tab_id == "backup":
+            self.backup_tab = BackupTab(self.current_tab_frame, self)
+            self.backup_tab.setup()
+        
         elif tab_id == "info":
             self.info_tab = InfoTab(self.current_tab_frame, self)
             self.info_tab.setup()
@@ -831,16 +838,26 @@ class WelVisionApp(tk.Tk):
                 # Show error popup
                 self._show_system_error_popup()
         
-        # Continue monitoring every 500ms if inspection is running
-        if hasattr(self, 'inspection_running') and self.inspection_running:
+        # Continue monitoring every 500ms if any system is running
+        is_any_system_running = (
+            (hasattr(self, 'inspection_running') and self.inspection_running) or
+            (hasattr(self, 'system_check_running') and self.system_check_running)
+        )
+        
+        if is_any_system_running:
             self.after(500, self._monitor_system_error)
     
     def _show_system_error_popup(self):
         """Show error popup and stop all processes."""
         from tkinter import messagebox
         
-        # Stop inspection immediately
-        if hasattr(self, 'inspection_running') and self.inspection_running:
+        # Track which module had the error for cleanup
+        error_in_inference = hasattr(self, 'inspection_running') and self.inspection_running
+        error_in_settings = hasattr(self, 'settings_tab') and self.settings_tab and hasattr(self.settings_tab, 'preview_active') and self.settings_tab.preview_active
+        error_in_system_check = hasattr(self, 'system_check_tab') and self.system_check_tab and hasattr(self.system_check_tab, 'system_running') and self.system_check_tab.system_running
+        
+        # Stop inspection immediately if running
+        if error_in_inference:
             try:
                 # Turn off PLC lights
                 plc_client = snap7.client.Client() 
@@ -873,6 +890,93 @@ class WelVisionApp(tk.Tk):
                 
             except Exception as e:
                 print(f"❌ Error during emergency shutdown: {e}")
+        
+        # Stop settings preview if running
+        if error_in_settings:
+            try:
+                # Force stop preview without save/discard dialog
+                self.settings_tab.preview_active = False
+                if self.settings_tab.preview_stop_flag:
+                    self.settings_tab.preview_stop_flag.set()
+                
+                # Turn off PLC lights
+                try:
+                    plc_client = snap7.client.Client()
+                    plc_client.connect("172.17.8.17", 0, 1)
+                    data = plc_client.read_area(Areas.DB, 86, 0, 2)
+                    set_bool(data, byte_index=1, bool_index=6, value=False)
+                    set_bool(data, byte_index=1, bool_index=7, value=False)
+                    plc_client.write_area(Areas.DB, 86, 0, data)
+                    plc_client.disconnect()
+                except:
+                    pass
+                
+                # Unload models
+                if self.settings_tab.preview_bf_model is not None:
+                    del self.settings_tab.preview_bf_model
+                    self.settings_tab.preview_bf_model = None
+                
+                if self.settings_tab.preview_od_model is not None:
+                    del self.settings_tab.preview_od_model
+                    self.settings_tab.preview_od_model = None
+                
+                # Stop camera processes
+                if self.settings_tab.preview_bf_camera_process is not None:
+                    self.process_manager.register_preview_process(self.settings_tab.preview_bf_camera_process)
+                
+                if self.settings_tab.preview_od_camera_process is not None:
+                    self.process_manager.register_preview_process(self.settings_tab.preview_od_camera_process)
+                
+                self.process_manager.stop_all_preview()
+                
+                # Clear references
+                self.settings_tab.preview_bf_camera_process = None
+                self.settings_tab.preview_od_camera_process = None
+                
+                # Unblock navigation and controls
+                self.settings_tab._unblock_navigation_buttons()
+                self.settings_tab._unblock_logout_button()
+                self.settings_tab._unblock_model_dropdowns()
+                self.settings_tab._unblock_save_button()
+                
+                # Update preview control panel
+                if self.settings_tab.preview_control_panel:
+                    self.settings_tab.preview_control_panel.enable_start()
+                
+            except Exception as e:
+                print(f"❌ Error stopping settings preview: {e}")
+        
+        # Stop system check if running
+        if error_in_system_check:
+            try:
+                # Force stop system check
+                if self.system_check_tab.plc_controller:
+                    self.system_check_tab.plc_controller.stop_monitoring()
+                
+                self.system_check_tab.system_running = False
+                self.system_check_tab.app.system_check_running = False
+                
+                # Unblock navigation and controls
+                self.system_check_tab._unblock_navigation_buttons()
+                self.system_check_tab._unblock_logout_button()
+                
+                if self.system_check_tab.control_settings:
+                    self.system_check_tab.control_settings.enable_controls()
+                    self.system_check_tab.controls_are_disabled = False
+                    self.system_check_tab.app.system_check_controls_disabled = False
+                
+                if self.system_check_tab.system_control:
+                    self.system_check_tab.system_control.enable_start()
+                
+            except Exception as e:
+                print(f"❌ Error stopping system check: {e}")
+        
+        # Restore normal app closing protocol
+        if hasattr(self, 'on_closing'):
+            self.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
+        # Clean up GPU memory
+        self.process_manager.cleanup_gpu_memory()
         
         # Show error message
         messagebox.showerror(

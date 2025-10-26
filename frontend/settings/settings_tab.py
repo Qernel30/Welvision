@@ -420,26 +420,26 @@ class SettingsTab:
         """Start the camera preview with model inference."""
         if self.preview_active:
             print("Preview already running!")
-            return
+            return False
         
         # ===== VALIDATION CHECKS BEFORE PREVIEW =====
         # 1. Check if models are available
         models_ok, models_error = self._check_models_available()
         if not models_ok:
             messagebox.showerror("Models Check Failed", models_error)
-            return
+            return False
         
         # 2. Check PLC connection
         plc_ok, plc_error = self._check_plc_connection()
         if not plc_ok:
             messagebox.showerror("PLC Check Failed", plc_error)
-            return
+            return False
         
         # 3. Check cameras
         cameras_ok, cameras_error = self._check_cameras_connected()
         if not cameras_ok:
             messagebox.showerror("Camera Check Failed", cameras_error)
-            return
+            return False
         
         # All checks passed - proceed with preview
         # Get selected models
@@ -455,7 +455,7 @@ class SettingsTab:
                 "Both BF and OD models are required.\n\n"
                 "Please upload models in the Model Management tab first."
             )
-            return
+            return False
         
         # Initialize stop flag
         self.preview_stop_flag = ThreadStopFlag()
@@ -477,7 +477,7 @@ class SettingsTab:
         except Exception as e:
             messagebox.showerror("Model Load Error", f"Failed to load models:\n{str(e)}")
             print(f"❌ Error loading models: {e}")
-            return
+            return False
         
         # Take snapshot of current threshold values
         self._save_threshold_snapshot()
@@ -508,7 +508,12 @@ class SettingsTab:
             self.app.protocol("WM_DELETE_WINDOW", self._block_closing)
         
         # Start camera update threads
-        self._start_preview_threads()    
+        self._start_preview_threads()
+        
+        # Start monitoring for system errors during preview
+        self._monitor_preview_errors()
+        
+        return True  # Preview started successfully    
     
     def stop_preview(self):
         """Stop the camera preview with save/discard option."""
@@ -606,7 +611,7 @@ class SettingsTab:
             # Start BF camera capture
             self.preview_bf_camera_process = Process(
                 target=capture_frames_bigface,
-                args=(self.app.shared_frame_bigface, self.app.frame_lock_bigface, self.app.frame_shape),
+                args=(self.app.shared_frame_bigface, self.app.frame_lock_bigface, self.app.frame_shape, self.app.shared_data),
                 daemon=True
             )
             self.preview_bf_camera_process.start()
@@ -617,7 +622,7 @@ class SettingsTab:
             # Start OD camera capture
             self.preview_od_camera_process = Process(
                 target=capture_frames_od,
-                args=(self.app.shared_frame_od, self.app.frame_lock_od, self.app.frame_shape),
+                args=(self.app.shared_frame_od, self.app.frame_lock_od, self.app.frame_shape, self.app.shared_data),
                 daemon=True
             )
             self.preview_od_camera_process.start()
@@ -811,6 +816,9 @@ class SettingsTab:
                 print(f"❌ OD preview thread error: {e}")
                 import traceback
                 traceback.print_exc()
+                # Set system error flag
+                if hasattr(self.app, 'shared_data') and self.app.shared_data:
+                    self.app.shared_data['system_error'] = True
                 break
         
     def _update_bf_preview(self):
@@ -873,6 +881,9 @@ class SettingsTab:
                 print(f"❌ BF preview thread error: {e}")
                 import traceback
                 traceback.print_exc()
+                # Set system error flag
+                if hasattr(self.app, 'shared_data') and self.app.shared_data:
+                    self.app.shared_data['system_error'] = True
                 break
 
     def _display_black_screens(self):
@@ -1026,6 +1037,110 @@ class SettingsTab:
             "Please stop the preview before closing the application."
         )
     
+    def _monitor_preview_errors(self):
+        """Monitor for system errors during preview mode."""
+        if not self.preview_active:
+            return
+        
+        if hasattr(self.app, 'shared_data') and self.app.shared_data:
+            # Check if system error occurred
+            if self.app.shared_data.get('system_error', False):
+                # Reset the flag
+                self.app.shared_data['system_error'] = False
+                
+                # Show error popup and force stop preview
+                self._show_preview_error_popup()
+                return  # Don't continue monitoring
+        
+        # Continue monitoring every 500ms if preview is still active
+        if self.preview_active:
+            self.parent.after(500, self._monitor_preview_errors)
+    
+    def _show_preview_error_popup(self):
+        """Show error popup and force stop preview."""
+        from tkinter import messagebox
+        
+        # Force stop preview without save/discard dialog
+        try:
+            # Turn off PLC lights
+            try:
+                plc_client = snap7.client.Client()
+                plc_client.connect("172.17.8.17", 0, 1)
+                data = plc_client.read_area(Areas.DB, 86, 0, 2)
+                set_bool(data, byte_index=1, bool_index=6, value=False)
+                set_bool(data, byte_index=1, bool_index=7, value=False)
+                plc_client.write_area(Areas.DB, 86, 0, data)
+                plc_client.disconnect()
+            except:
+                pass
+            
+            self.preview_active = False
+            
+            # Signal threads to stop
+            if self.preview_stop_flag:
+                self.preview_stop_flag.set()
+            
+            # Unload models
+            if self.preview_bf_model is not None:
+                del self.preview_bf_model
+                self.preview_bf_model = None
+            
+            if self.preview_od_model is not None:
+                del self.preview_od_model
+                self.preview_od_model = None
+            
+            # Stop camera processes
+            if self.preview_bf_camera_process is not None:
+                self.app.process_manager.register_preview_process(self.preview_bf_camera_process)
+            
+            if self.preview_od_camera_process is not None:
+                self.app.process_manager.register_preview_process(self.preview_od_camera_process)
+            
+            self.app.process_manager.stop_all_preview()
+            
+            # Clear references
+            self.preview_bf_camera_process = None
+            self.preview_od_camera_process = None
+            
+            # Unblock navigation and controls
+            self._unblock_navigation_buttons()
+            self._unblock_logout_button()
+            self._unblock_model_dropdowns()
+            self._unblock_save_button()
+            
+            # Update preview control panel
+            if self.preview_control_panel:
+                self.preview_control_panel.enable_start()
+            
+            # Restore normal app closing
+            if hasattr(self.app, 'on_closing'):
+                self.app.protocol("WM_DELETE_WINDOW", self.app.on_closing)
+            
+            # Display black screens
+            self._display_black_screens()
+            
+            # Clean up GPU memory
+            self.app.process_manager.cleanup_gpu_memory()
+            
+        except Exception as e:
+            print(f"❌ Error during preview emergency stop: {e}")
+        
+        # Show error message
+        messagebox.showerror(
+            "Preview Error Detected",
+            "⚠️ A critical error occurred during preview!\n\n"
+            "The preview has been stopped automatically.\n\n"
+            "Possible causes:\n"
+            "• Camera disconnection\n"
+            "• PLC communication error\n"
+            "• GPU memory overflow\n"
+            "• Model inference failure\n\n"
+            "Recommended action:\n"
+            "Please check camera and PLC connections.\n"
+            "Restart the application if the issue persists.\n\n"
+            "Click OK to continue using other features."
+        )
+    
     def _check_models_available(self):
         """
         Check if both BF and OD models are available.
@@ -1090,9 +1205,7 @@ class SettingsTab:
                 cap.release()
         
         if len(cameras_connected) < 2:
-            camera_names = {0: "BF Camera", 1: "OD Camera"}
-            missing = [camera_names[i] for i in [0, 1] if i not in cameras_connected]
-            return False, f"⚠️ Cameras Not Connected\n\nRequired: 2 cameras\nDetected: {len(cameras_connected)} camera(s)\n\nMissing: {', '.join(missing)}\n\nPlease connect all cameras and try again."
+            return False, f"⚠️ Cameras Not Connected\n\nRequired: 2 cameras\nDetected: {len(cameras_connected)} camera(s)\n\nPlease connect all cameras and try again."
         
         return True, ""
     

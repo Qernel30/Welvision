@@ -94,6 +94,10 @@ class NavBarManager:
         elif tab_id == "system_check":
             return Permissions.can_access_system_check_tab(user_role)
         
+        # Backup - Admin and Super Admin only
+        elif tab_id == "backup":
+            return Permissions.can_access_backup_tab(user_role)
+        
         # All other tabs - accessible to all roles
         else:
             return True

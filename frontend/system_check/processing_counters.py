@@ -196,7 +196,7 @@ class ProcessingCounters:
         od_accepted = shared_data.get('system_check_od_accepted', 0)
         od_rejected = shared_data.get('system_check_od_rejected', 0)
         
-        self.od_processed_label.config(text=str(od_processed))
+        self.od_processed_label.config(text=str(bf_accepted))
         self.od_accepted_label.config(text=str(od_accepted))
         self.od_rejected_label.config(text=str(od_rejected))
         
@@ -208,6 +208,6 @@ class ProcessingCounters:
         total_accepted = shared_data.get('system_check_total_accepted', 0)
         total_rejected = shared_data.get('system_check_total_rejected', 0)
         
-        self.total_passed_label.config(text=str(total_passed))
-        self.total_accepted_label.config(text=str(total_accepted))
+        self.total_passed_label.config(text=str(bf_processed))
+        self.total_accepted_label.config(text=str(od_accepted))
         self.total_rejected_label.config(text=str(total_rejected))

@@ -111,7 +111,6 @@ class PLCController:
         if self.monitoring_thread:
             self.monitoring_thread.join(timeout=2.0)
         self.disconnect()
-        print("⛔ System Check: Monitoring stopped")
     
     def _monitor_loop(self):
         """Main monitoring loop - runs in separate thread."""
@@ -120,6 +119,9 @@ class PLCController:
                 # Check if PLC client is still connected
                 if not self.plc_client:
                     print("⚠ System Check: PLC client disconnected, stopping monitor loop")
+                    # Set system error flag
+                    if hasattr(self.app, 'shared_data') and self.app.shared_data:
+                        self.app.shared_data['system_error'] = True
                     break
                 
                 # Read sensor data from PLC
@@ -142,6 +144,8 @@ class PLCController:
                 if hasattr(self.app, 'shared_data') and self.app.shared_data:
                     self.app.shared_data['bigface_presence'] = bf_presence
                     self.app.shared_data['od_presence'] = od_presence
+                    self.app.shared_data['bigface'] = bf_accept_reject
+                    self.app.shared_data['od'] = od_accept_reject
                 
                 # Detect rising edge for BF presence - increment processed counter
                 if bf_presence and not self.prev_bf_presence:
@@ -165,13 +169,13 @@ class PLCController:
                 self.prev_bf_accept_reject = bf_accept_reject
                 self.prev_od_accept_reject = od_accept_reject
                 
-                # Small delay to avoid overwhelming PLC
-                time.sleep(0.05)
-                
             except Exception as e:
                 # Only print error if we're still supposed to be running
                 if self.running:
                     print(f"❌ System Check: Monitoring error: {e}")
+                    # Set system error flag
+                    if hasattr(self.app, 'shared_data') and self.app.shared_data:
+                        self.app.shared_data['system_error'] = True
                     time.sleep(0.1)
                 else:
                     # System is stopping, exit gracefully
@@ -260,42 +264,64 @@ class PLCController:
         Send accept/reject signal to PLC for BigFace.
         
         Args:
-            accept: True to accept (send False to PLC), False to reject (send True to PLC)
+            accept: True to accept, False to reject
         """
         try:
             # Read current data
-            data = self.plc_client.read_area(Areas.DB, self.DB_NUMBER, 0, 1)
+            data = self.plc_client.read_area(Areas.DB, self.DB_NUMBER, 0, 2)
             
-            # Set BF signal - Byte 0, Bit 2
-            # INVERTED LOGIC: PLC expects True=Reject, False=Accept
-            plc_value = not accept  # Invert: Accept (True) → False, Reject (False) → True
-            set_bool(data, 0, 2, plc_value)
-            self.plc_client.write_area(Areas.DB, self.DB_NUMBER, 0, data)
-            
+            if accept:
+                # BF Accept Bin - Byte 1, Bit 0
+                set_bool(data, 1, 0, True)
+                self.plc_client.write_area(Areas.DB, self.DB_NUMBER, 0, data)
+                time.sleep(0.1)
+                set_bool(data, 1, 0, False)
+                self.plc_client.write_area(Areas.DB, self.DB_NUMBER, 0, data)
+            else:
+                # BF Reject Bin - Byte 1, Bit 1
+                set_bool(data, 1, 1, True)
+                self.plc_client.write_area(Areas.DB, self.DB_NUMBER, 0, data)
+                time.sleep(0.1)
+                set_bool(data, 1, 1, False)
+                self.plc_client.write_area(Areas.DB, self.DB_NUMBER, 0, data)
             
         except Exception as e:
             print(f"⚠ System Check: Error sending BF signal: {e}")
+            # Set system error flag
+            if hasattr(self.app, 'shared_data') and self.app.shared_data:
+                self.app.shared_data['system_error'] = True
     
     def _send_od_signal(self, accept):
         """
         Send accept/reject signal to PLC for OD.
         
         Args:
-            accept: True to accept (send False to PLC), False to reject (send True to PLC)
+            accept: True to accept, False to reject
         """
         try:
             # Read current data
-            data = self.plc_client.read_area(Areas.DB, self.DB_NUMBER, 0, 1)
+            data = self.plc_client.read_area(Areas.DB, self.DB_NUMBER, 0, 2)
             
-            # Set OD signal - Byte 0, Bit 0
-            # INVERTED LOGIC: PLC expects True=Reject, False=Accept
-            plc_value = not accept  # Invert: Accept (True) → False, Reject (False) → True
-            set_bool(data, 0, 0, plc_value)
-            self.plc_client.write_area(Areas.DB, self.DB_NUMBER, 0, data)
-            
+            if accept:
+                # OD Accept Bin - Byte 1, Bit 2
+                set_bool(data, 1, 2, True)
+                self.plc_client.write_area(Areas.DB, self.DB_NUMBER, 0, data)
+                time.sleep(0.1)
+                set_bool(data, 1, 2, False)
+                self.plc_client.write_area(Areas.DB, self.DB_NUMBER, 0, data)
+            else:
+                # OD Reject Bin - Byte 1, Bit 3
+                set_bool(data, 1, 3, True)
+                self.plc_client.write_area(Areas.DB, self.DB_NUMBER, 0, data)
+                time.sleep(0.1)
+                set_bool(data, 1, 3, False)
+                self.plc_client.write_area(Areas.DB, self.DB_NUMBER, 0, data)
             
         except Exception as e:
             print(f"⚠ System Check: Error sending OD signal: {e}")
+            # Set system error flag
+            if hasattr(self.app, 'shared_data') and self.app.shared_data:
+                self.app.shared_data['system_error'] = True
     
     def _update_statistics(self):
         """Update shared data statistics for UI display."""
@@ -337,4 +363,3 @@ class PLCController:
         self.od_counter = 0
         
         self._update_statistics()
-        print("🔄 System Check: Counters reset")

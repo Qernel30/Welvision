@@ -45,7 +45,7 @@ class DiagnosisTab:
         main_container = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
         main_container.pack(fill=tk.BOTH, expand=True)
         
-        # Header frame for title and company info
+        # Header frame for title
         header_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
         header_frame.pack(fill=tk.X, pady=(10, 10))
         
@@ -58,20 +58,6 @@ class DiagnosisTab:
             bg=Colors.PRIMARY_BG
         )
         title_label.pack()
-        
-        # Company footer in top right
-        company_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
-        company_frame.place(relx=1.0, y=10, anchor=tk.NE)
-        
-        company_label = tk.Label(
-            company_frame,
-            text="Developed and Maintained by\n© Welvision Pvt Limited",
-            font=Fonts.TEXT_BOLD,
-            fg="#FFFFFF",
-            bg=Colors.PRIMARY_BG,
-            justify=tk.RIGHT
-        )
-        company_label.pack(padx=20)
         
         # Top section: Report Data Table + Controls + Actions (increased height for visibility)
         top_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG, height=280)

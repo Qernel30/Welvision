@@ -33,7 +33,7 @@ class ModelManagementTab:
         """Setup the model management tab UI."""
         # Main container
         main_container = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
-        main_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
         # Title
         title_label = tk.Label(
@@ -43,21 +43,7 @@ class ModelManagementTab:
             fg=Colors.WHITE,
             bg=Colors.PRIMARY_BG
         )
-        title_label.pack(pady=(0, 20))
-        
-        # Company footer in top right (below logout button area)
-        company_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
-        company_frame.place(relx=1.0, y=10, anchor=tk.NE)
-        
-        company_label = tk.Label(
-            company_frame,
-            text="Developed and Maintained by\n© Welvision Pvt Limited",
-            font=Fonts.TEXT_BOLD,
-            fg="#FFFFFF",
-            bg=Colors.PRIMARY_BG,
-            justify=tk.RIGHT
-        )
-        company_label.pack(padx=20)
+        title_label.pack(pady=(0, 10))
         
         # Upload section
         self.upload_section = UploadSection(main_container, self)
@@ -73,7 +59,7 @@ class ModelManagementTab:
             bd=2,
             relief=tk.RIDGE
         )
-        models_frame.pack(fill=tk.BOTH, expand=True, pady=(20, 10))
+        models_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 5))
         
         # Models table
         self.models_table = ModelsTable(models_frame, self)

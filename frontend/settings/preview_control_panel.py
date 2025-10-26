@@ -64,10 +64,11 @@ class PreviewControlPanel:
     def _on_start_preview(self):
         """Handle start preview button click."""
         # Delegate to settings tab
-        self.settings_tab.start_preview()
+        success = self.settings_tab.start_preview()
         
-        # Update button states
-        self.enable_stop()
+        # Update button states only if preview started successfully
+        if success:
+            self.enable_stop()
     
     def _on_stop_preview(self):
         """Handle stop preview button click."""
