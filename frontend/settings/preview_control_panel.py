@@ -22,6 +22,8 @@ class PreviewControlPanel:
         self.settings_tab = settings_tab_instance
         self.start_button = None
         self.stop_button = None
+        self.capture_bf_button = None
+        self.capture_od_button = None
         self.control_frame = None
         
     def setup(self):
@@ -59,6 +61,32 @@ class PreviewControlPanel:
         )
         self.stop_button.pack(side=tk.LEFT, padx=10, pady=5)
         
+        # Capture BF button (hidden by default)
+        self.capture_bf_button = tk.Button(
+            self.control_frame,
+            text="📸 Capture BF",
+            font=Fonts.TEXT_BOLD,
+            bg="#FFA500",  # Orange
+            fg=Colors.WHITE,
+            width=15,
+            height=2,
+            command=self._on_capture_bf
+        )
+        # Don't pack yet - will be shown when preview starts
+        
+        # Capture OD button (hidden by default)
+        self.capture_od_button = tk.Button(
+            self.control_frame,
+            text="📸 Capture OD",
+            font=Fonts.TEXT_BOLD,
+            bg="#FFA500",  # Orange
+            fg=Colors.WHITE,
+            width=15,
+            height=2,
+            command=self._on_capture_od
+        )
+        # Don't pack yet - will be shown when preview starts
+        
         return self.control_frame
     
     def _on_start_preview(self):
@@ -78,12 +106,26 @@ class PreviewControlPanel:
         # Update button states
         self.enable_start()
     
+    def _on_capture_bf(self):
+        """Handle capture BF button click."""
+        self.settings_tab.capture_bf_frame()
+    
+    def _on_capture_od(self):
+        """Handle capture OD button click."""
+        self.settings_tab.capture_od_frame()
+    
     def enable_start(self):
         """Enable the start button and disable stop button."""
         if self.start_button:
             self.start_button.config(state=tk.NORMAL, bg=Colors.SUCCESS)
         if self.stop_button:
             self.stop_button.config(state=tk.DISABLED, bg="#6c757d")
+        
+        # Hide capture buttons
+        if self.capture_bf_button:
+            self.capture_bf_button.pack_forget()
+        if self.capture_od_button:
+            self.capture_od_button.pack_forget()
     
     def enable_stop(self):
         """Enable the stop button and disable start button."""
@@ -91,3 +133,9 @@ class PreviewControlPanel:
             self.start_button.config(state=tk.DISABLED, bg="#6c757d")
         if self.stop_button:
             self.stop_button.config(state=tk.NORMAL, bg=Colors.DANGER)
+        
+        # Show capture buttons after Stop button
+        if self.capture_bf_button:
+            self.capture_bf_button.pack(side=tk.LEFT, padx=10, pady=5)
+        if self.capture_od_button:
+            self.capture_od_button.pack(side=tk.LEFT, padx=10, pady=5)

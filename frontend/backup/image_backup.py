@@ -163,7 +163,6 @@ class ImageBackupManager:
         if folder_path:
             self.src_path_var.set(folder_path)
             self.selected_files = []  # Clear file selection when folder is selected
-            print(f"Selected source folder: {folder_path}")
     
     def _select_source_files(self):
         """Select multiple source image files."""
@@ -194,7 +193,6 @@ class ImageBackupManager:
         
         if dest_path:
             self.dest_path_var.set(dest_path)
-            print(f"Selected destination: {dest_path}")
     
     def copy_images(self):
         """Copy images from source to destination with storage check."""
@@ -249,6 +247,25 @@ class ImageBackupManager:
             if not StorageChecker.check_storage_space(dest_path, total_size):
                 return  # User cancelled or insufficient space
             
+            # Check if destination folder already exists (for folder copy)
+            if not self.selected_files:
+                # Folder is being copied
+                folder_name = os.path.basename(src_path)
+                final_dest_path = os.path.join(dest_path, folder_name)
+                
+                if os.path.exists(final_dest_path):
+                    overwrite = messagebox.askyesno(
+                        "Folder Already Exists",
+                        f"⚠️ The folder '{folder_name}' already exists at the destination:\n\n"
+                        f"{final_dest_path}\n\n"
+                        f"Do you want to overwrite the existing files?\n\n"
+                        f"Note: Existing files with the same name will be replaced.",
+                        icon='warning'
+                    )
+                    
+                    if not overwrite:
+                        return
+            
             # Confirm copy operation
             file_count = len(files_to_copy)
             size_mb = total_size / (1024 * 1024)
@@ -268,7 +285,7 @@ class ImageBackupManager:
             from .copy_progress import CopyProgressWindow
             
             # Perform copy with progress
-            success_count = CopyProgressWindow.copy_files_with_progress(
+            success_count, actual_dest_path = CopyProgressWindow.copy_files_with_progress(
                 self.parent,
                 files_to_copy,
                 dest_path,
@@ -282,13 +299,15 @@ class ImageBackupManager:
                     "Copy Completed",
                     f"✅ Successfully copied {success_count} file(s)!\n\n"
                     f"Total size: {size_mb:.2f} MB\n"
-                    f"Destination: {dest_path}\n\n"
+                    f"Destination: {actual_dest_path}\n\n"
                     f"Do you want to open the destination folder?",
                     icon='info'
                 )
                 
                 if response == 'yes':
-                    subprocess.run(['explorer', dest_path])
+                    # Normalize path for Windows Explorer (convert forward slashes to backslashes)
+                    normalized_path = os.path.normpath(actual_dest_path)
+                    subprocess.run(['explorer', normalized_path])
             else:
                 messagebox.showwarning(
                     "Copy Completed with Errors",

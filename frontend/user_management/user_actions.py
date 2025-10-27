@@ -31,7 +31,7 @@ class UserActions:
         button_config = {
             'font': ("Arial", 11, "bold"),
             'cursor': 'hand2',
-            'width': 14,
+            'width': 15,
             'height': 1,
             'pady': 8
         }

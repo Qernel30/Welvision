@@ -109,20 +109,27 @@ class UserManagementTab:
     def populate_user_details(self, user_data):
         """
         Populate user details panel with selected user data.
+        This is called when a user is selected from the table.
         
         Args:
             user_data: Dictionary containing user information
         """
-        if self.user_details_panel:
-            self.user_details_panel.populate(user_data)
+        # Don't auto-populate form when user is selected
+        # User must click an action button (Read, Update, etc.)
+        pass
     
     def clear_form(self):
         """Clear the user details form."""
         if self.user_details_panel:
-            self.user_details_panel.clear()
+            self.user_details_panel.hide_form()
     
     def add_user(self):
-        """Add a new user."""
+        """Add a new user (called from button or internally from panel)."""
+        # Show the add form if not already shown
+        if self.user_details_panel.form_mode != 'add':
+            self.user_details_panel.show_add_form()
+            return
+        
         # Get form data
         data = self.user_details_panel.get_data()
         
@@ -205,7 +212,7 @@ class UserManagementTab:
             if success:
                 self.user_actions.show_success(message)
                 self.refresh_users()
-                self.clear_form()
+                self.user_details_panel.hide_form()
             else:
                 self.user_actions.show_error(message)
         else:
@@ -219,21 +226,20 @@ class UserManagementTab:
             self.user_actions.show_warning("Please select a user from the table")
             return
         
-        # Populate details panel (already done via selection event)
-        # Show info message
-        from tkinter import messagebox
-        messagebox.showinfo(
-            "User Information",
-            f"Employee ID: {selected_user['employee_id']}\n"
-            f"Email: {selected_user['email']}\n"
-            f"Role: {selected_user['role']}\n"
-            f"Status: {selected_user['status']}\n"
-            f"Failed Attempts: {selected_user.get('failed_attempts', 0)}\n"
-            f"Created: {selected_user.get('created_at', 'N/A')}"
-        )
+        # Show the read form with user data
+        self.user_details_panel.show_read_form(selected_user)
     
     def update_user(self):
         """Update selected user."""
+        # If form is not in update mode, show the update form
+        if self.user_details_panel.form_mode != 'update':
+            selected_user = self.users_table.get_selected_user()
+            if not selected_user:
+                self.user_actions.show_warning("Please select a user from the table")
+                return
+            self.user_details_panel.show_update_form(selected_user)
+            return
+        
         # Get form data
         data = self.user_details_panel.get_data()
         
@@ -369,7 +375,7 @@ class UserManagementTab:
             if success:
                 self.user_actions.show_success(message)
                 self.refresh_users()
-                self.clear_form()
+                self.user_details_panel.hide_form()
             else:
                 self.user_actions.show_error(message)
         else:
@@ -377,6 +383,15 @@ class UserManagementTab:
     
     def change_password(self):
         """Change password for selected user."""
+        # If form is not in change_password mode, show the password form
+        if self.user_details_panel.form_mode != 'change_password':
+            selected_user = self.users_table.get_selected_user()
+            if not selected_user:
+                self.user_actions.show_warning("Please select a user to change password")
+                return
+            self.user_details_panel.show_password_form(selected_user)
+            return
+        
         # Get form data
         data = self.user_details_panel.get_data()
         
@@ -391,6 +406,17 @@ class UserManagementTab:
         if data['new_password'] != data['confirm_password']:
             self.user_actions.show_error("Passwords do not match")
             return
+        
+        # Check if new password is same as current password
+        if hasattr(self.user_details_panel, 'current_password_hash') and hasattr(self.user_details_panel, 'current_salt'):
+            import hashlib
+            # Hash new password with the same salt
+            new_password_salt = (data['new_password'] + self.user_details_panel.current_salt).encode('utf-8')
+            new_password_hash = hashlib.sha256(new_password_salt).hexdigest()
+            
+            if new_password_hash == self.user_details_panel.current_password_hash:
+                self.user_actions.show_error("New password cannot be the same as current password")
+                return
         
         # Validate password strength
         is_valid, msg = self.user_actions.validate_password(data['new_password'])
@@ -415,9 +441,7 @@ class UserManagementTab:
             
             if success:
                 self.user_actions.show_success(message)
-                # Clear password fields
-                self.user_details_panel.new_password_var.set('')
-                self.user_details_panel.confirm_password_var.set('')
+                self.user_details_panel.hide_form()
             else:
                 self.user_actions.show_error(message)
         else:

@@ -187,6 +187,7 @@ class DiagnosisTab:
         import subprocess
         import pandas as pd
         from tkinter import messagebox
+        from openpyxl.styles import Font, PatternFill
         
         if not self.current_data:
             messagebox.showwarning(
@@ -217,18 +218,40 @@ class DiagnosisTab:
             filename = f"{component_type}_{report_type}_{from_date}_{to_date}.xlsx"
             filepath = os.path.join(base_path, filename)
             
-            # Convert data to DataFrame
+            # Convert data to DataFrame and add S.No column
             df = pd.DataFrame(self.current_data)
+            
+            # Insert S.No column at the beginning
+            df.insert(0, 'S.No', range(1, len(df) + 1))
             
             # Calculate sum row for numeric columns
             sum_row = {}
+            total_inspected = 0
+            total_accepted = 0
+            
             for col in df.columns:
-                if col in ['S.No', 'Component Type', 'Employee ID', 'Report Date', 'Start Time', 'End Time', 'Acceptance Rate']:
-                    sum_row[col] = 'Total' if col == 'S.No' else ''
+                if col == 'S.No':
+                    sum_row[col] = 'Total'
+                elif col in ['Component Type', 'Employee ID', 'Report Date', 'Start Time', 'End Time']:
+                    sum_row[col] = ''
+                elif col == 'Acceptance Rate':
+                    # Calculate percentage for sum row
+                    if total_inspected > 0:
+                        acceptance_rate = (total_accepted / total_inspected) * 100
+                        sum_row[col] = f"{acceptance_rate:.2f}%"
+                    else:
+                        sum_row[col] = "0.00%"
                 else:
                     # Sum numeric columns
                     try:
-                        sum_row[col] = df[col].sum()
+                        sum_value = df[col].sum()
+                        sum_row[col] = sum_value
+                        
+                        # Track inspected and accepted for percentage calculation
+                        if 'Inspected' in col:
+                            total_inspected = sum_value
+                        elif 'Accepted' in col:
+                            total_accepted = sum_value
                     except:
                         sum_row[col] = ''
             
@@ -239,14 +262,26 @@ class DiagnosisTab:
             with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
                 df.to_excel(writer, index=False, sheet_name='Report')
                 
-                # Auto-adjust column widths
+                # Get the worksheet
                 worksheet = writer.sheets['Report']
+                
+                # Auto-adjust column widths
                 for idx, col in enumerate(df.columns):
                     max_length = max(
                         df[col].astype(str).apply(len).max(),
                         len(str(col))
                     )
                     worksheet.column_dimensions[chr(65 + idx)].width = min(max_length + 2, 50)
+                
+                # Style the sum row (last row) - Blue color and bold font
+                last_row_idx = len(df) + 1  # +1 because Excel rows are 1-indexed and we have header
+                blue_fill = PatternFill(start_color="0000FF", end_color="0000FF", fill_type="solid")
+                white_font = Font(bold=True, color="FFFFFF")
+                
+                for col_idx in range(1, len(df.columns) + 1):
+                    cell = worksheet.cell(row=last_row_idx, column=col_idx)
+                    cell.fill = blue_fill
+                    cell.font = white_font
             
             # Create custom dialog with "Open Location" option
             result = messagebox.askquestion(

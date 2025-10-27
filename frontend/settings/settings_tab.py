@@ -1209,6 +1209,94 @@ class SettingsTab:
         
         return True, ""
     
+    def capture_bf_frame(self):
+        """Capture current BF frame and save to disk."""
+        if not self.preview_active:
+            messagebox.showwarning("Preview Not Active", "Please start the preview first before capturing frames.")
+            return
+        
+        try:
+            from datetime import datetime
+            import os
+            
+            # Get current frame from shared memory
+            with self.app.frame_lock_bigface:
+                np_frame = np.frombuffer(
+                    self.app.shared_frame_bigface.get_obj(), 
+                    dtype=np.uint8
+                ).reshape(self.app.frame_shape)
+                frame = np_frame.copy()
+            
+            # Create directory path
+            username = os.getlogin()
+            save_path = f"C:\\Users\\{username}\\Desktop\\Settings Frame\\BF"
+            os.makedirs(save_path, exist_ok=True)
+            
+            # Create filename with current timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Remove last 3 digits of microseconds
+            filename = f"{timestamp}.jpg"
+            filepath = os.path.join(save_path, filename)
+            
+            # Save the frame
+            cv2.imwrite(filepath, frame)
+            
+            # Show success message
+            messagebox.showinfo(
+                "Frame Captured",
+                f"✅ BF frame captured successfully!\n\n"
+                f"Saved to:\n{filepath}"
+            )
+            
+        except Exception as e:
+            print(f"❌ Error capturing BF frame: {e}")
+            import traceback
+            traceback.print_exc()
+            messagebox.showerror("Capture Error", f"Failed to capture BF frame:\n{str(e)}")
+    
+    def capture_od_frame(self):
+        """Capture current OD frame and save to disk."""
+        if not self.preview_active:
+            messagebox.showwarning("Preview Not Active", "Please start the preview first before capturing frames.")
+            return
+        
+        try:
+            from datetime import datetime
+            import os
+            
+            # Get current frame from shared memory
+            with self.app.frame_lock_od:
+                np_frame = np.frombuffer(
+                    self.app.shared_frame_od.get_obj(), 
+                    dtype=np.uint8
+                ).reshape(self.app.frame_shape)
+                frame = np_frame.copy()
+            
+            # Create directory path
+            username = os.getlogin()
+            save_path = f"C:\\Users\\{username}\\Desktop\\Settings Frame\\OD"
+            os.makedirs(save_path, exist_ok=True)
+            
+            # Create filename with current timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Remove last 3 digits of microseconds
+            filename = f"{timestamp}.jpg"
+            filepath = os.path.join(save_path, filename)
+            
+            # Save the frame
+            cv2.imwrite(filepath, frame)
+            
+            # Show success message
+            messagebox.showinfo(
+                "Frame Captured",
+                f"✅ OD frame captured successfully!\n\n"
+                f"Saved to:\n{filepath}"
+            )
+            
+        except Exception as e:
+            print(f"❌ Error capturing OD frame: {e}")
+            import traceback
+            traceback.print_exc()
+            messagebox.showerror("Capture Error", f"Failed to capture OD frame:\n{str(e)}")
+    
     def cleanup(self):
         """Cleanup method called when settings tab is destroyed."""
         # Unbind mousewheel event immediately

@@ -8,8 +8,8 @@ from ..user_management.user_database import UserDatabase
 # Legacy user database (kept for backward compatibility if needed)
 users = {
     "": {"password": "", "role": "Operator"},
-    "admin@welvision.com": {"password": "admin123", "role": "Admin"},
-    "superadmin@welvision.com": {"password": "super123", "role": "Super Admin"}
+    "admin": {"password": "admin123", "role": "Admin"},
+    "super": {"password": "super123", "role": "Super Admin"}
 }
 
 

@@ -90,7 +90,6 @@ class ModelActions:
                     try:
                         if os.path.exists(model['model_path']):
                             os.remove(model['model_path'])
-                            print(f"✅ Deleted model file: {model['model_path']}")
                     except Exception as e:
                         print(f"⚠ Warning: Could not delete file: {e}")
                     

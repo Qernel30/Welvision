@@ -26,10 +26,19 @@ class CopyProgressWindow:
             selected_files: List of selected files (if any)
             
         Returns:
-            int: Number of successfully copied files
+            tuple: (success_count, actual_destination_path)
         """
         success_count = 0
         total_files = len(file_list)
+        
+        # Determine actual destination path
+        if selected_files:
+            # Multiple files selected - copy to destination root
+            actual_dest_path = dest_path
+        else:
+            # Folder selected - include folder name in destination
+            folder_name = os.path.basename(src_path)
+            actual_dest_path = os.path.join(dest_path, folder_name)
         
         # Create progress window
         progress_win = tk.Toplevel(parent)
@@ -83,14 +92,13 @@ class CopyProgressWindow:
                 progress_win.update()
                 
                 # Determine destination file path
-                # Preserve folder structure if source is a folder
                 if selected_files:
                     # Multiple files selected - copy to destination root
-                    dest_file = os.path.join(dest_path, os.path.basename(src_file))
+                    dest_file = os.path.join(actual_dest_path, os.path.basename(src_file))
                 else:
-                    # Folder selected - preserve structure
+                    # Folder selected - copy with folder name included
                     rel_path = os.path.relpath(src_file, src_path)
-                    dest_file = os.path.join(dest_path, rel_path)
+                    dest_file = os.path.join(actual_dest_path, rel_path)
                 
                 # Create destination directory if needed
                 dest_dir = os.path.dirname(dest_file)
@@ -107,4 +115,5 @@ class CopyProgressWindow:
         # Close progress window
         progress_win.destroy()
         
-        return success_count
+        # Return the actual destination path where files were copied
+        return success_count, actual_dest_path

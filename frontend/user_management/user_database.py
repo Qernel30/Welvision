@@ -150,7 +150,7 @@ class UserDatabase:
             cursor = self.connection.cursor(dictionary=True)
             
             query = """
-            SELECT id, employee_id, email, role, is_active, 
+            SELECT id, employee_id, email, role, is_active, password_hash, salt,
                    failed_attempts, locked_until, created_at, updated_at
             FROM users
             WHERE id = %s
