@@ -73,6 +73,9 @@ class InferenceTab:
         """Update OD camera feed display."""
         od_feed = self.camera_manager.get_feed('od')
         
+        # Optimize sleep timing for better performance
+        frame_delay = 0.025  # ~40 FPS target (reduced from 30ms)
+        
         while not self.app.camera_stop_flag.is_set():
             try:
                 # Check if feed still exists
@@ -102,6 +105,9 @@ class InferenceTab:
 
                 # Update the camera feed
                 od_feed.update_frame(frame)
+                
+                # Optimized sleep
+                time.sleep(frame_delay)
             except Exception as e:
                 # Handle exceptions and exit gracefully
                 print(f"OD camera thread error: {e}")
@@ -113,6 +119,9 @@ class InferenceTab:
     def update_bf_camera(self):
         """Update Bigface camera feed display."""
         bf_feed = self.camera_manager.get_feed('bf')
+        
+        # Optimize sleep timing for better performance
+        frame_delay = 0.025  # ~40 FPS target (reduced from 30ms)
         
         while not self.app.camera_stop_flag.is_set():
             try:
@@ -142,6 +151,9 @@ class InferenceTab:
 
                 # Update the camera feed
                 bf_feed.update_frame(frame)
+                
+                # Optimized sleep
+                time.sleep(frame_delay)
             except Exception as e:
                 # Handle exceptions and exit gracefully
                 print(f"BF camera thread error: {e}")
@@ -171,44 +183,56 @@ class InferenceTab:
     
     def _monitor_status_updates(self):
         """Monitor shared_data for status updates and update status panel."""
-        if hasattr(self.app, 'shared_data') and self.app.shared_data and self.status_panel:
-            # Get system_ready flag (master control)
-            system_ready = self.app.shared_data.get('system_ready', False)
-            
-            if system_ready:
-                # System is ready - show actual status
+        try:
+            if hasattr(self.app, 'shared_data') and self.app.shared_data and self.status_panel:
+                # Get system_ready flag (master control)
+                system_ready = self.app.shared_data.get('system_ready', False)
                 
-                # Update Machine Mode based on system_mode flag
-                system_mode = self.app.shared_data.get('system_mode', False)
-                if system_mode:
-                    self.status_panel.update_machine_mode("AUTO", "#00ff00")  # Green
+                if system_ready:
+                    # System is ready - show actual status
+                    
+                    # Update Machine Mode based on system_mode flag
+                    system_mode = self.app.shared_data.get('system_mode', False)
+                    if system_mode:
+                        self.status_panel.update_machine_mode("AUTO", "#00ff00")  # Green
+                    else:
+                        self.status_panel.update_machine_mode("MANUAL", "#ff0000")  # Red
+                    
+                    # Update Disc Status based on disc_status flag
+                    disc_status = self.app.shared_data.get('disc_status', False)
+                    if disc_status:
+                        self.status_panel.update_disc_status("READY", "#00ff00")  # Green
+                    else:
+                        self.status_panel.update_disc_status("NOT READY", "#ff0000")  # Red
                 else:
-                    self.status_panel.update_machine_mode("MANUAL", "#ff0000")  # Red
+                    # System is not ready - show "Not Available" in yellow for both
+                    self.status_panel.update_machine_mode("Not Available", "#ffff00")  # Yellow
+                    self.status_panel.update_disc_status("Not Available", "#ffff00")  # Yellow
                 
-                # Update Disc Status based on disc_status flag
-                disc_status = self.app.shared_data.get('disc_status', False)
-                if disc_status:
-                    self.status_panel.update_disc_status("READY", "#00ff00")  # Green
-                else:
-                    self.status_panel.update_disc_status("NOT READY", "#ff0000")  # Red
-            else:
-                # System is not ready - show "Not Available" in yellow for both
-                self.status_panel.update_machine_mode("Not Available", "#ffff00")  # Yellow
-                self.status_panel.update_disc_status("Not Available", "#ffff00")  # Yellow
+                # Update results panel from shared_data
+                if self.results_panel:
+                    self.results_panel.update_from_shared_data(self.app.shared_data)
+                
+                # Update model names in status panel (less frequently)
+                if self.status_panel and not hasattr(self, '_model_update_counter'):
+                    self._model_update_counter = 0
+                
+                if hasattr(self, '_model_update_counter'):
+                    self._model_update_counter += 1
+                    if self._model_update_counter >= 10:  # Update every 5 seconds instead of 500ms
+                        self.status_panel.update_model_names()
+                        self._model_update_counter = 0
             
-            # Update results panel from shared_data
-            if self.results_panel:
-                self.results_panel.update_from_shared_data(self.app.shared_data)
-            
-            # Update model names in status panel
-            if self.status_panel:
-                self.status_panel.update_model_names()
-        
-        # Refresh roller list if data was updated (check flag)
-        if hasattr(self.app, 'roller_data_updated') and self.app.roller_data_updated:
-            if self.status_panel and hasattr(self.status_panel, 'refresh_roller_list'):
-                self.status_panel.refresh_roller_list()
-            self.app.roller_data_updated = False
+            # Refresh roller list if data was updated (check flag)
+            if hasattr(self.app, 'roller_data_updated') and self.app.roller_data_updated:
+                if self.status_panel and hasattr(self.status_panel, 'refresh_roller_list'):
+                    self.status_panel.refresh_roller_list()
+                self.app.roller_data_updated = False
+        except:
+            pass  # Silently continue on errors
         
         # Continue monitoring every 500ms
-        self.parent.after(500, self._monitor_status_updates)
+        try:
+            self.parent.after(500, self._monitor_status_updates)
+        except:
+            pass  # Tab might be destroyed

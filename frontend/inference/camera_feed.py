@@ -29,6 +29,9 @@ class CameraFeed:
         self.title = title
         self.canvas_id = canvas_id
         self.canvas = None
+        self._last_update_time = 0
+        self._frame_skip_counter = 0
+        self._image_id = None  # Track canvas image ID for efficient updates
         
     def create(self, row, column):
         """
@@ -84,9 +87,14 @@ class CameraFeed:
             img = PIL.Image.fromarray(cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB))
             imgtk = PIL.ImageTk.PhotoImage(image=img)
             
-            # Update canvas
-            self.canvas.create_image(0, 0, anchor=tk.NW, image=imgtk)
+            # Memory leak fix: Create new image first, then delete old one (prevents flicker)
+            old_image_id = self._image_id
+            self._image_id = self.canvas.create_image(0, 0, anchor=tk.NW, image=imgtk)
             self.canvas.image = imgtk  # Keep a reference to prevent garbage collection
+            
+            # Delete old image after new one is displayed
+            if old_image_id is not None:
+                self.canvas.delete(old_image_id)
         except tk.TclError:
             # Widget has been destroyed, stop updating
             return
@@ -94,6 +102,19 @@ class CameraFeed:
             # Handle any other exceptions silently
             print(f"Error updating camera feed: {e}")
             return
+    
+    def cleanup(self):
+        """Clean up resources and clear canvas."""
+        try:
+            if self.canvas and self.canvas.winfo_exists():
+                # Delete all canvas items
+                self.canvas.delete("all")
+                # Clear image reference
+                if hasattr(self.canvas, 'image'):
+                    delattr(self.canvas, 'image')
+            self._image_id = None
+        except:
+            pass
 
 
 class CameraFeedManager:

@@ -560,7 +560,7 @@ class WelVisionApp(tk.Tk):
         
     
     def stop_inspection(self):
-        """Stop the inspection process."""
+        """Stop the inspection process with proper cleanup."""
         if not self.inspection_running:
             print("Inspection is not running.")
             return
@@ -592,6 +592,21 @@ class WelVisionApp(tk.Tk):
         # Clear process references
         self.plc_process = None
         self.processes = []
+        
+        # Clean up camera feeds to release image memory
+        if hasattr(self, 'inference_tab') and self.inference_tab:
+            if hasattr(self.inference_tab, 'camera_manager') and self.inference_tab.camera_manager:
+                for feed_id in ['bf', 'od']:
+                    feed = self.inference_tab.camera_manager.get_feed(feed_id)
+                    if feed and hasattr(feed, 'cleanup'):
+                        feed.cleanup()
+        
+        # Force garbage collection to free memory
+        import gc
+        gc.collect()
+        
+        # Small delay to ensure processes are fully stopped
+        time.sleep(0.3)
             
     def on_nav_change(self, button_id):
         """
@@ -604,7 +619,7 @@ class WelVisionApp(tk.Tk):
     
     def show_tab(self, tab_id):
         """
-        Show the specified tab.
+        Show the specified tab with optimized switching.
         
         Args:
             tab_id: ID of the tab to show
@@ -637,9 +652,11 @@ class WelVisionApp(tk.Tk):
             except:
                 pass
         
-        # Clear current tab content
+        # Clear current tab content - use destroy_later for smoother transition
         if self.current_tab_frame:
-            self.current_tab_frame.destroy()
+            old_frame = self.current_tab_frame
+            # Schedule destruction after new frame is created
+            self.after(10, lambda: old_frame.destroy() if old_frame.winfo_exists() else None)
         
         # Create new tab frame
         self.current_tab_frame = tk.Frame(self.content_frame, bg=Colors.PRIMARY_BG)

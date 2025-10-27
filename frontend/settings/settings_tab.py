@@ -97,15 +97,30 @@ class SettingsTab:
         scrollbar = ttk.Scrollbar(main_container, orient="vertical", command=self.canvas.yview)
         self.scrollable_frame = tk.Frame(self.canvas, bg=Colors.PRIMARY_BG)
         
-        # Debounced scroll region update
+        # Debounced scroll region update with longer delay for better performance
         self._scroll_update_id = None
+        self._last_scroll_update = 0
         
         def _update_scroll_region(event=None):
             # Cancel pending update
             if self._scroll_update_id:
                 self.canvas.after_cancel(self._scroll_update_id)
-            # Schedule new update after 100ms
-            self._scroll_update_id = self.canvas.after(100, lambda: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+            
+            # Throttle updates to max once per 200ms
+            import time
+            current_time = time.time()
+            if current_time - self._last_scroll_update < 0.2:
+                return
+            
+            # Schedule new update after 200ms
+            def _do_update():
+                try:
+                    self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+                    self._last_scroll_update = time.time()
+                except:
+                    pass
+            
+            self._scroll_update_id = self.canvas.after(200, _do_update)
         
         self.scrollable_frame.bind("<Configure>", _update_scroll_region)
         
@@ -122,10 +137,28 @@ class SettingsTab:
         
         self.canvas.bind("<Configure>", _on_canvas_configure)
         
-        # Enable mouse wheel scrolling - OPTIMIZED VERSION
+        # Enable mouse wheel scrolling - HEAVILY OPTIMIZED VERSION
+        self._scroll_throttle_id = None
+        
         def _on_mousewheel(event):
-            # Smooth scrolling with larger steps
-            self.canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+            # Check if canvas still exists before scrolling
+            if not self.canvas or not self.canvas.winfo_exists():
+                return
+            
+            # Throttle scroll events to prevent lag
+            if self._scroll_throttle_id:
+                return  # Ignore if already processing
+            
+            try:
+                # Scroll with acceleration based on delta
+                delta = -1 if event.delta > 0 else 1
+                self.canvas.yview_scroll(delta * 2, "units")  # 2x speed for smoother feel
+                
+                # Reset throttle after 16ms (~60fps)
+                self._scroll_throttle_id = self.canvas.after(16, lambda: setattr(self, '_scroll_throttle_id', None))
+            except tk.TclError:
+                # Canvas was destroyed, ignore
+                pass
         
         def _bind_mousewheel(event=None):
             self.canvas.bind_all("<MouseWheel>", _on_mousewheel)
@@ -234,9 +267,13 @@ class SettingsTab:
                 del temp_bf_model
                 del temp_od_model
                 
-                # Update canvas scroll region
-                self.canvas.update_idletasks()
-                self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+                # Update canvas scroll region - deferred to avoid blocking
+                def _update_scroll():
+                    try:
+                        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+                    except:
+                        pass
+                self.canvas.after(100, _update_scroll)
                 
                 # Load latest thresholds from database for these models
                 bf_model_name = self.app.selected_bf_model_name
@@ -516,7 +553,7 @@ class SettingsTab:
         return True  # Preview started successfully    
     
     def stop_preview(self):
-        """Stop the camera preview with save/discard option."""
+        """Stop the camera preview with save/discard option and proper cleanup."""
         if not self.preview_active:
             print("Preview is not running.")
             return
@@ -601,8 +638,22 @@ class SettingsTab:
         self.preview_bf_camera_process = None
         self.preview_od_camera_process = None
         
+        # Clean up camera feeds to release image memory
+        if self.preview_camera_manager:
+            for feed_id in ['bf', 'od']:
+                feed = self.preview_camera_manager.get_feed(feed_id)
+                if feed and hasattr(feed, 'cleanup'):
+                    feed.cleanup()
+        
         # Clean up GPU memory
         self.app.process_manager.cleanup_gpu_memory()
+        
+        # Force garbage collection to free memory
+        import gc
+        gc.collect()
+        
+        # Small delay to ensure cleanup is complete
+        time.sleep(0.3)
         
     
     def _start_camera_capture_processes(self):
@@ -810,7 +861,7 @@ class SettingsTab:
                     black_frame = np.zeros(self.app.frame_shape, dtype=np.uint8)
                     od_feed.update_frame(black_frame)
                 
-                time.sleep(0.03)  # ~30 FPS
+                    time.sleep(0.03)  # ~30 FPS
                 
             except Exception as e:
                 print(f"❌ OD preview thread error: {e}")
@@ -875,7 +926,7 @@ class SettingsTab:
                     black_frame = np.zeros(self.app.frame_shape, dtype=np.uint8)
                     bf_feed.update_frame(black_frame)
                 
-                time.sleep(0.03)  # ~30 FPS
+                    time.sleep(0.03)  # ~30 FPS
                 
             except Exception as e:
                 print(f"❌ BF preview thread error: {e}")
@@ -1054,7 +1105,10 @@ class SettingsTab:
         
         # Continue monitoring every 500ms if preview is still active
         if self.preview_active:
-            self.parent.after(500, self._monitor_preview_errors)
+            try:
+                self.parent.after(500, self._monitor_preview_errors)
+            except:
+                pass  # Tab might be destroyed
     
     def _show_preview_error_popup(self):
         """Show error popup and force stop preview."""

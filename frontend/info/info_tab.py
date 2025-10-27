@@ -79,15 +79,30 @@ class InfoTab:
         scrollbar = ttk.Scrollbar(main_container, orient="vertical", command=self.canvas.yview)
         self.scrollable_frame = tk.Frame(self.canvas, bg=Colors.PRIMARY_BG)
         
-        # Debounced scroll region update
+        # Debounced scroll region update with throttling
         self._scroll_update_id = None
+        self._last_scroll_update = 0
         
         def _update_scroll_region(event=None):
             # Cancel pending update
             if self._scroll_update_id:
                 self.canvas.after_cancel(self._scroll_update_id)
-            # Schedule new update after 100ms
-            self._scroll_update_id = self.canvas.after(100, lambda: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+            
+            # Throttle updates to max once per 200ms
+            import time
+            current_time = time.time()
+            if current_time - self._last_scroll_update < 0.2:
+                return
+            
+            # Schedule new update after 200ms
+            def _do_update():
+                try:
+                    self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+                    self._last_scroll_update = time.time()
+                except:
+                    pass
+            
+            self._scroll_update_id = self.canvas.after(200, _do_update)
         
         self.scrollable_frame.bind("<Configure>", _update_scroll_region)
         
@@ -106,8 +121,16 @@ class InfoTab:
         
         # Enable mouse wheel scrolling - OPTIMIZED VERSION
         def _on_mousewheel(event):
-            # Smooth scrolling with larger steps
-            self.canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+            # Check if canvas still exists before scrolling
+            if not self.canvas or not self.canvas.winfo_exists():
+                return
+            
+            try:
+                # Smooth scrolling with larger steps
+                self.canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+            except tk.TclError:
+                # Canvas was destroyed, ignore
+                pass
         
         def _bind_mousewheel(event=None):
             self.canvas.bind_all("<MouseWheel>", _on_mousewheel)
@@ -181,9 +204,13 @@ class InfoTab:
         self.user_manual = UserManual(self.scrollable_frame, self.app)
         self.user_manual.create()
         
-        # Final scroll region update
-        self.canvas.update_idletasks()
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        # Final scroll region update - deferred to avoid blocking
+        def _final_update():
+            try:
+                self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+            except:
+                pass
+        self.canvas.after(100, _final_update)
     
     def cleanup(self):
         """Cleanup method called when tab is destroyed."""

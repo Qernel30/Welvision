@@ -127,7 +127,10 @@ class SystemCheckTab:
                 self.processing_counters.update_counters(self.app.shared_data)
         
         # Continue monitoring every 100ms for faster sensor status updates
-        self.parent.after(100, self._monitor_updates)
+        try:
+            self.parent.after(100, self._monitor_updates)
+        except:
+            pass  # Tab might be destroyed
     
     def start_system(self):
         """Start the system check control."""
