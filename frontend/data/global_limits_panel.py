@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import messagebox
 from ..utils.styles import Colors, Fonts
 from ..utils.permissions import Permissions
+from ..utils.debug_logger import log_error, log_warning, log_info
 from .data_database import DataDatabase
 
 
@@ -217,11 +218,14 @@ class GlobalLimitsPanel:
     def save_machine_range(self):
         """Save machine range to database."""
         try:
+            log_info("data", "Attempting to save global roller limits")
+            
             # Validate all fields are filled
             values = {}
             for field_name, entry in self.entries.items():
                 value = entry.get().strip()
                 if not value:
+                    log_warning("data", f"Save global limits validation failed: {field_name} is empty")
                     messagebox.showerror("Validation Error", 
                                        f"Please fill in all fields.\n\n{field_name} is empty.")
                     return
@@ -229,6 +233,7 @@ class GlobalLimitsPanel:
                 try:
                     values[field_name] = float(value)
                 except ValueError:
+                    log_warning("data", f"Save global limits validation failed: Invalid value for {field_name} = {value}")
                     messagebox.showerror("Validation Error", 
                                        f"Invalid value for {field_name}.\n\nPlease enter a valid number.")
                     return
@@ -243,6 +248,7 @@ class GlobalLimitsPanel:
             
             for min_field, max_field, dimension_name in validations:
                 if values[min_field] >= values[max_field]:
+                    log_warning("data", f"Save global limits validation failed: {dimension_name} min >= max ({values[min_field]} >= {values[max_field]})")
                     messagebox.showerror("Validation Error", 
                                        f"{dimension_name}: Minimum value must be less than maximum value.")
                     return
@@ -254,12 +260,15 @@ class GlobalLimitsPanel:
             success = self.db.save_global_limits(values, updated_by)
             
             if success:
+                log_info("data", f"Global roller limits saved successfully by user '{updated_by}'")
                 messagebox.showinfo("Success", "Global roller limits saved successfully!")
                 self.load_current_limits()
             else:
+                log_error("data", "Failed to save global limits - Database operation returned False")
                 messagebox.showerror("Error", "Failed to save global limits to database.")
         
         except Exception as e:
+            log_error("data", "Error saving global roller limits", e)
             print(f"❌ Error saving machine range: {e}")
             messagebox.showerror("Error", f"Failed to save machine range:\n{str(e)}")
     

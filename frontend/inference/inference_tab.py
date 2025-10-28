@@ -9,6 +9,7 @@ import time
 import threading
 from ..utils.styles import Colors
 from ..utils.config import AppConfig
+from ..utils.debug_logger import log_error, log_warning, log_info
 from .status_panel import StatusPanel
 from .camera_feed import CameraFeedManager
 from .control_panel import ControlPanel
@@ -39,35 +40,44 @@ class InferenceTab:
         
     def setup(self):
         """Setup the inference tab UI in a single-frame layout."""
-        # Main container
-        main_container = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
-        main_container.pack(fill=tk.BOTH, expand=True)
-        
-        # Top section: Status panel
-        self.status_panel = StatusPanel(main_container, self.app)
-        self.status_panel.create()
-        
-        # Start monitoring status updates
-        self._monitor_status_updates()
-        
-        # Middle section: Camera feeds only (full width)
-        middle_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
-        middle_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        self.camera_manager = CameraFeedManager(middle_frame)
-        self.camera_manager.setup()
-        
-        # Bottom section: Results with roller info and control panel
-        bottom_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
-        bottom_frame.pack(fill=tk.X, padx=5, pady=5)
-        
-        # Results panel (includes roller info now)
-        self.results_panel = ResultsPanel(bottom_frame, self.app)
-        self.results_panel.create()
-        
-        # Control panel
-        self.control_panel = ControlPanel(bottom_frame, self.app)
-        self.control_panel.setup()
+        try:
+            log_info("inference", "Setting up Inference tab UI")
+            
+            # Main container
+            main_container = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
+            main_container.pack(fill=tk.BOTH, expand=True)
+            
+            # Top section: Status panel
+            self.status_panel = StatusPanel(main_container, self.app)
+            self.status_panel.create()
+            
+            # Start monitoring status updates
+            self._monitor_status_updates()
+            
+            # Middle section: Camera feeds only (full width)
+            middle_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
+            middle_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+            
+            self.camera_manager = CameraFeedManager(middle_frame)
+            self.camera_manager.setup()
+            
+            # Bottom section: Results with roller info and control panel
+            bottom_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
+            bottom_frame.pack(fill=tk.X, padx=5, pady=5)
+            
+            # Results panel (includes roller info now)
+            self.results_panel = ResultsPanel(bottom_frame, self.app)
+            self.results_panel.create()
+            
+            # Control panel
+            self.control_panel = ControlPanel(bottom_frame, self.app)
+            self.control_panel.setup()
+            
+            log_info("inference", "Inference tab setup completed successfully")
+            
+        except Exception as e:
+            log_error("inference", "Failed to setup Inference tab", e)
+            raise
     
     def update_od_camera(self):
         """Update OD camera feed display."""
@@ -110,7 +120,12 @@ class InferenceTab:
                 time.sleep(frame_delay)
             except Exception as e:
                 # Handle exceptions and exit gracefully
-                print(f"OD camera thread error: {e}")
+                error_msg = f"OD camera thread error: {e}"
+                print(error_msg)
+                log_error("inference", "OD camera update failed", e, {
+                    "camera_id": "OD",
+                    "inspection_running": getattr(self.app, 'inspection_running', False)
+                })
                 # Set system error flag
                 if hasattr(self.app, 'shared_data') and self.app.shared_data:
                     self.app.shared_data['system_error'] = True
@@ -156,7 +171,12 @@ class InferenceTab:
                 time.sleep(frame_delay)
             except Exception as e:
                 # Handle exceptions and exit gracefully
-                print(f"BF camera thread error: {e}")
+                error_msg = f"BF camera thread error: {e}"
+                print(error_msg)
+                log_error("inference", "BF camera update failed", e, {
+                    "camera_id": "BF",
+                    "inspection_running": getattr(self.app, 'inspection_running', False)
+                })
                 # Set system error flag
                 if hasattr(self.app, 'shared_data') and self.app.shared_data:
                     self.app.shared_data['system_error'] = True
@@ -164,22 +184,31 @@ class InferenceTab:
     
     def start_camera_threads(self):
         """Start camera feed update threads."""
-        # Clear stop flag
-        self.app.camera_stop_flag.clear()
-        
-        self.app.od_thread = threading.Thread(target=self.update_od_camera, name="OD_Camera_Thread")
-        self.app.od_thread.daemon = True
-        self.app.od_thread.start()
-        
-        # Register thread with process manager
-        self.app.process_manager.register_inference_thread(self.app.od_thread)
-        
-        self.app.bf_thread = threading.Thread(target=self.update_bf_camera, name="BF_Camera_Thread")
-        self.app.bf_thread.daemon = True
-        self.app.bf_thread.start()
-        
-        # Register thread with process manager
-        self.app.process_manager.register_inference_thread(self.app.bf_thread)
+        try:
+            log_info("inference", "Starting camera feed threads")
+            
+            # Clear stop flag
+            self.app.camera_stop_flag.clear()
+            
+            self.app.od_thread = threading.Thread(target=self.update_od_camera, name="OD_Camera_Thread")
+            self.app.od_thread.daemon = True
+            self.app.od_thread.start()
+            
+            # Register thread with process manager
+            self.app.process_manager.register_inference_thread(self.app.od_thread)
+            
+            self.app.bf_thread = threading.Thread(target=self.update_bf_camera, name="BF_Camera_Thread")
+            self.app.bf_thread.daemon = True
+            self.app.bf_thread.start()
+            
+            # Register thread with process manager
+            self.app.process_manager.register_inference_thread(self.app.bf_thread)
+            
+            log_info("inference", "Camera feed threads started successfully")
+            
+        except Exception as e:
+            log_error("inference", "Failed to start camera threads", e)
+            raise
     
     def _monitor_status_updates(self):
         """Monitor shared_data for status updates and update status panel."""

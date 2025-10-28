@@ -6,6 +6,7 @@ Manages application settings, system information, and user manual
 import tkinter as tk
 import tkinter.ttk as ttk
 from ..utils.styles import Colors, Fonts
+from ..utils.debug_logger import log_error, log_warning, log_info
 from .title_management import TitleManagement
 from .settings_history import SettingsHistory
 from .system_information import SystemInformation
@@ -41,130 +42,138 @@ class InfoTab:
     
     def setup(self):
         """Setup the info tab UI with scrolling support."""
-        # Unbind previous mousewheel if it was bound
-        if self._mousewheel_bound:
-            try:
-                if hasattr(self, 'canvas') and self.canvas:
-                    self.canvas.unbind_all("<MouseWheel>")
-                self._mousewheel_bound = False
-            except:
-                pass
-        
-        # Create main container
-        main_container = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
-        main_container.pack(fill=tk.BOTH, expand=True)
-        
-        # Title
-        title_label = tk.Label(
-            main_container,
-            text="Application Settings",
-            font=Fonts.TITLE,
-            fg=Colors.WHITE,
-            bg=Colors.PRIMARY_BG
-        )
-        title_label.pack(pady=(10, 5))
-        
-        # Subtitle
-        subtitle_label = tk.Label(
-            main_container,
-            text="Configure application preferences and system settings",
-            font=Fonts.TEXT,
-            fg="#CCCCCC",
-            bg=Colors.PRIMARY_BG
-        )
-        subtitle_label.pack(pady=(0, 10))
-        
-        # Create canvas for scrolling
-        self.canvas = tk.Canvas(main_container, bg=Colors.PRIMARY_BG, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(main_container, orient="vertical", command=self.canvas.yview)
-        self.scrollable_frame = tk.Frame(self.canvas, bg=Colors.PRIMARY_BG)
-        
-        # Debounced scroll region update with throttling
-        self._scroll_update_id = None
-        self._last_scroll_update = 0
-        
-        def _update_scroll_region(event=None):
-            # Cancel pending update
-            if self._scroll_update_id:
-                self.canvas.after_cancel(self._scroll_update_id)
+        try:
+            log_info("info", "Setting up Info tab")
             
-            # Throttle updates to max once per 200ms
-            import time
-            current_time = time.time()
-            if current_time - self._last_scroll_update < 0.2:
-                return
-            
-            # Schedule new update after 200ms
-            def _do_update():
-                try:
-                    self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-                    self._last_scroll_update = time.time()
-                except:
-                    pass
-            
-            self._scroll_update_id = self.canvas.after(200, _do_update)
-        
-        self.scrollable_frame.bind("<Configure>", _update_scroll_region)
-        
-        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw", width=self.canvas.winfo_reqwidth())
-        self.canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # Pack canvas and scrollbar
-        self.canvas.pack(side="left", fill="both", expand=True, padx=20, pady=(0, 20))
-        scrollbar.pack(side="right", fill="y")
-        
-        # Bind canvas resize to update window width
-        def _on_canvas_configure(event):
-            self.canvas.itemconfig(self.canvas.find_withtag("all")[0], width=event.width)
-        
-        self.canvas.bind("<Configure>", _on_canvas_configure)
-        
-        # Enable mouse wheel scrolling - OPTIMIZED VERSION
-        def _on_mousewheel(event):
-            # Check if canvas still exists before scrolling
-            if not self.canvas or not self.canvas.winfo_exists():
-                return
-            
-            try:
-                # Smooth scrolling with larger steps
-                self.canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
-            except tk.TclError:
-                # Canvas was destroyed, ignore
-                pass
-        
-        def _bind_mousewheel(event=None):
-            self.canvas.bind_all("<MouseWheel>", _on_mousewheel)
-            self._mousewheel_bound = True
-        
-        def _unbind_mousewheel(event=None):
+            # Unbind previous mousewheel if it was bound
             if self._mousewheel_bound:
                 try:
-                    self.canvas.unbind_all("<MouseWheel>")
+                    if hasattr(self, 'canvas') and self.canvas:
+                        self.canvas.unbind_all("<MouseWheel>")
                     self._mousewheel_bound = False
                 except:
                     pass
-        
-        # Bind only when mouse enters the canvas area
-        self.canvas.bind("<Enter>", _bind_mousewheel)
-        self.canvas.bind("<Leave>", _unbind_mousewheel)
-        
-        # Initial bind
-        _bind_mousewheel()
-        
-        # ===== LAZY LOADING - Create components on-demand =====
-        # Show loading message while components load
-        loading_label = tk.Label(
-            self.scrollable_frame,
-            text="⏳ Loading components...",
-            font=Fonts.SUBTITLE,
-            fg="#FFD700",
-            bg=Colors.PRIMARY_BG,
-            pady=50
-        )
-        loading_label.pack()
-        
-        # Load components asynchronously to avoid blocking UI
-        self.parent.after(50, lambda: self._load_components(loading_label))
+            
+            # Create main container
+            main_container = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
+            main_container.pack(fill=tk.BOTH, expand=True)
+            
+            # Title
+            title_label = tk.Label(
+                main_container,
+                text="Application Settings",
+                font=Fonts.TITLE,
+                fg=Colors.WHITE,
+                bg=Colors.PRIMARY_BG
+            )
+            title_label.pack(pady=(10, 5))
+            
+            # Subtitle
+            subtitle_label = tk.Label(
+                main_container,
+                text="Configure application preferences and system settings",
+                font=Fonts.TEXT,
+                fg="#CCCCCC",
+                bg=Colors.PRIMARY_BG
+            )
+            subtitle_label.pack(pady=(0, 10))
+            
+            # Create canvas for scrolling
+            self.canvas = tk.Canvas(main_container, bg=Colors.PRIMARY_BG, highlightthickness=0)
+            scrollbar = ttk.Scrollbar(main_container, orient="vertical", command=self.canvas.yview)
+            self.scrollable_frame = tk.Frame(self.canvas, bg=Colors.PRIMARY_BG)
+            
+            # Debounced scroll region update with throttling
+            self._scroll_update_id = None
+            self._last_scroll_update = 0
+            
+            def _update_scroll_region(event=None):
+                # Cancel pending update
+                if self._scroll_update_id:
+                    self.canvas.after_cancel(self._scroll_update_id)
+                
+                # Throttle updates to max once per 200ms
+                import time
+                current_time = time.time()
+                if current_time - self._last_scroll_update < 0.2:
+                    return
+                
+                # Schedule new update after 200ms
+                def _do_update():
+                    try:
+                        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+                        self._last_scroll_update = time.time()
+                    except:
+                        pass
+                
+                self._scroll_update_id = self.canvas.after(200, _do_update)
+            
+            self.scrollable_frame.bind("<Configure>", _update_scroll_region)
+            
+            self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw", width=self.canvas.winfo_reqwidth())
+            self.canvas.configure(yscrollcommand=scrollbar.set)
+            
+            # Pack canvas and scrollbar
+            self.canvas.pack(side="left", fill="both", expand=True, padx=20, pady=(0, 20))
+            scrollbar.pack(side="right", fill="y")
+            
+            # Bind canvas resize to update window width
+            def _on_canvas_configure(event):
+                self.canvas.itemconfig(self.canvas.find_withtag("all")[0], width=event.width)
+            
+            self.canvas.bind("<Configure>", _on_canvas_configure)
+            
+            # Enable mouse wheel scrolling - OPTIMIZED VERSION
+            def _on_mousewheel(event):
+                # Check if canvas still exists before scrolling
+                if not self.canvas or not self.canvas.winfo_exists():
+                    return
+                
+                try:
+                    # Smooth scrolling with larger steps
+                    self.canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+                except tk.TclError:
+                    # Canvas was destroyed, ignore
+                    pass
+            
+            def _bind_mousewheel(event=None):
+                self.canvas.bind_all("<MouseWheel>", _on_mousewheel)
+                self._mousewheel_bound = True
+            
+            def _unbind_mousewheel(event=None):
+                if self._mousewheel_bound:
+                    try:
+                        self.canvas.unbind_all("<MouseWheel>")
+                        self._mousewheel_bound = False
+                    except:
+                        pass
+            
+            # Bind only when mouse enters the canvas area
+            self.canvas.bind("<Enter>", _bind_mousewheel)
+            self.canvas.bind("<Leave>", _unbind_mousewheel)
+            
+            # Initial bind
+            _bind_mousewheel()
+            
+            # ===== LAZY LOADING - Create components on-demand =====
+            # Show loading message while components load
+            loading_label = tk.Label(
+                self.scrollable_frame,
+                text="⏳ Loading components...",
+                font=Fonts.SUBTITLE,
+                fg="#FFD700",
+                bg=Colors.PRIMARY_BG,
+                pady=50
+            )
+            loading_label.pack()
+            
+            # Load components asynchronously to avoid blocking UI
+            self.parent.after(50, lambda: self._load_components(loading_label))
+            
+            log_info("info", "Info tab setup initiated (components loading asynchronously)")
+        except Exception as e:
+            log_error("info", "Failed to setup Info tab", e)
+            raise
     
     def _load_components(self, loading_label):
         """Load all components asynchronously."""

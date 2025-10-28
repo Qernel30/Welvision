@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import messagebox
 import mysql.connector
 from mysql.connector import Error
+from .debug_logger import log_error, log_warning
 
 
 class DatabaseErrorHandler:
@@ -60,6 +61,24 @@ class DatabaseErrorHandler:
         """
         # Don't show popup on login page or if already shown for this page
         current_page = DatabaseErrorHandler._current_page
+        
+        # Log the error to debug logger
+        if current_page:
+            error_details = {
+                "error_type": type(error).__name__,
+                "context": context
+            }
+            
+            if isinstance(error, mysql.connector.Error):
+                error_details["error_code"] = getattr(error, 'errno', 'Unknown')
+                error_details["sql_state"] = getattr(error, 'sqlstate', 'Unknown')
+            
+            log_error(
+                page_name=current_page,
+                error_context=f"Database error during {context}",
+                exception=error,
+                additional_info=error_details
+            )
         
         # Skip popup on login page
         if current_page == "login":

@@ -12,6 +12,7 @@ import shutil
 import psutil
 from pathlib import Path
 from ..utils.styles import Colors, Fonts
+from ..utils.debug_logger import log_error, log_warning, log_info
 
 
 class ImageBackupManager:
@@ -196,33 +197,38 @@ class ImageBackupManager:
     
     def copy_images(self):
         """Copy images from source to destination with storage check."""
-        # Validate source
-        src_path = self.src_path_var.get()
-        if not src_path and not self.selected_files:
-            messagebox.showwarning(
-                "No Source Selected",
-                "⚠️ Please select a source folder or image files first."
-            )
-            return
-        
-        # Validate destination
-        dest_path = self.dest_path_var.get()
-        if not dest_path:
-            messagebox.showwarning(
-                "No Destination Selected",
-                "⚠️ Please select a destination folder first."
-            )
-            return
-        
-        # Check if destination exists
-        if not os.path.exists(dest_path):
-            messagebox.showerror(
-                "Invalid Destination",
-                f"❌ Destination path does not exist:\n{dest_path}"
-            )
-            return
-        
         try:
+            log_info("backup", "Attempting to copy images/backup operation")
+            
+            # Validate source
+            src_path = self.src_path_var.get()
+            if not src_path and not self.selected_files:
+                log_warning("backup", "Copy images failed: No source selected")
+                messagebox.showwarning(
+                    "No Source Selected",
+                    "⚠️ Please select a source folder or image files first."
+                )
+                return
+            
+            # Validate destination
+            dest_path = self.dest_path_var.get()
+            if not dest_path:
+                log_warning("backup", "Copy images failed: No destination selected")
+                messagebox.showwarning(
+                    "No Destination Selected",
+                    "⚠️ Please select a destination folder first."
+                )
+                return
+            
+            # Check if destination exists
+            if not os.path.exists(dest_path):
+                log_warning("backup", f"Copy images failed: Destination path does not exist - {dest_path}")
+                messagebox.showerror(
+                    "Invalid Destination",
+                    f"❌ Destination path does not exist:\n{dest_path}"
+                )
+                return
+            
             from .file_operations import FileOperations
             
             # Get list of files to copy
@@ -232,6 +238,7 @@ class ImageBackupManager:
             )
             
             if not files_to_copy:
+                log_info("backup", f"No image files found in source: {src_path}")
                 messagebox.showinfo(
                     "No Files Found",
                     "ℹ️ No image files found in the selected source."
@@ -240,11 +247,16 @@ class ImageBackupManager:
             
             # Calculate total size
             total_size = FileOperations.calculate_total_size(files_to_copy)
+            file_count = len(files_to_copy)
+            size_mb = total_size / (1024 * 1024)
+            
+            log_info("backup", f"Preparing to copy {file_count} files ({size_mb:.2f} MB) from '{src_path}' to '{dest_path}'")
             
             from .storage_checker import StorageChecker
             
             # Check destination storage
             if not StorageChecker.check_storage_space(dest_path, total_size):
+                log_warning("backup", f"Copy cancelled: Insufficient storage space at {dest_path}")
                 return  # User cancelled or insufficient space
             
             # Check if destination folder already exists (for folder copy)
@@ -264,12 +276,10 @@ class ImageBackupManager:
                     )
                     
                     if not overwrite:
+                        log_info("backup", f"Copy cancelled by user - destination folder exists: {final_dest_path}")
                         return
             
             # Confirm copy operation
-            file_count = len(files_to_copy)
-            size_mb = total_size / (1024 * 1024)
-            
             confirm = messagebox.askyesno(
                 "Confirm Copy",
                 f"📋 Copy Operation Details:\n\n"
@@ -280,10 +290,12 @@ class ImageBackupManager:
             )
             
             if not confirm:
+                log_info("backup", f"Copy operation cancelled by user - {file_count} files")
                 return
             
             from .copy_progress import CopyProgressWindow
             
+            log_info("backup", f"Starting copy operation - {file_count} files")
             # Perform copy with progress
             success_count, actual_dest_path = CopyProgressWindow.copy_files_with_progress(
                 self.parent,
@@ -295,6 +307,7 @@ class ImageBackupManager:
             
             # Show completion message
             if success_count == file_count:
+                log_info("backup", f"Copy completed successfully - {success_count}/{file_count} files copied to {actual_dest_path}")
                 response = messagebox.askquestion(
                     "Copy Completed",
                     f"✅ Successfully copied {success_count} file(s)!\n\n"
@@ -309,6 +322,7 @@ class ImageBackupManager:
                     normalized_path = os.path.normpath(actual_dest_path)
                     subprocess.run(['explorer', normalized_path])
             else:
+                log_warning("backup", f"Copy completed with errors - {success_count}/{file_count} files copied successfully")
                 messagebox.showwarning(
                     "Copy Completed with Errors",
                     f"⚠️ Copied {success_count} out of {file_count} file(s).\n\n"
@@ -317,6 +331,7 @@ class ImageBackupManager:
                 )
         
         except Exception as e:
+            log_error("backup", f"Error during image copy/backup operation", e)
             messagebox.showerror(
                 "Copy Error",
                 f"❌ An error occurred during copy:\n\n{str(e)}"

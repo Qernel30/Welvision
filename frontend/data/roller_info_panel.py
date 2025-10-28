@@ -6,6 +6,7 @@ CRUD operations for individual roller configurations
 import tkinter as tk
 from tkinter import messagebox
 from ..utils.styles import Colors, Fonts
+from ..utils.debug_logger import log_error, log_warning, log_info
 from .data_database import DataDatabase
 
 
@@ -277,17 +278,21 @@ class RollerInfoPanel:
     
     def update_roller(self):
         """Update the selected roller."""
-        if not self.selected_roller_id:
-            messagebox.showwarning("No Selection", 
-                                 "Please select a roller using the 'Read' button first.")
-            return
-        
         try:
+            log_info("data", f"Attempting to update roller (ID: {self.selected_roller_id})")
+            
+            if not self.selected_roller_id:
+                log_warning("data", "Update roller failed: No roller selected")
+                messagebox.showwarning("No Selection", 
+                                     "Please select a roller using the 'Read' button first.")
+                return
+            
             # Validate all fields are filled
             values = {}
             for field_name, entry in self.entries.items():
                 value = entry.get().strip()
                 if not value:
+                    log_warning("data", f"Update roller validation failed: {field_name} is empty")
                     messagebox.showerror("Validation Error", 
                                        f"Please fill in all fields.\n\n{field_name} is empty.")
                     return
@@ -300,6 +305,7 @@ class RollerInfoPanel:
                         else:
                             values[field_name] = float(value)
                     except ValueError:
+                        log_warning("data", f"Update roller validation failed: Invalid value for {field_name} = {value}")
                         messagebox.showerror("Validation Error", 
                                            f"Invalid value for {field_name}.\n\nPlease enter a valid number.")
                         return
@@ -308,6 +314,7 @@ class RollerInfoPanel:
             
             # Check if roller type already exists (excluding current roller)
             if self.db.roller_type_exists(values['roller_type'], exclude_id=self.selected_roller_id):
+                log_warning("data", f"Update roller failed: Roller type '{values['roller_type']}' already exists")
                 messagebox.showerror("Validation Error", 
                                    f"Roller type '{values['roller_type']}' already exists.\n\n"
                                    "Please use a unique name.")
@@ -331,6 +338,7 @@ class RollerInfoPanel:
                     validation_errors.append(f"Length must be between {global_limits['min_length']} and {global_limits['max_length']}")
                 
                 if validation_errors:
+                    log_warning("data", f"Update roller validation failed: Values exceed global limits - {validation_errors}")
                     messagebox.showerror("Validation Error", 
                                        "Values exceed global limits:\n\n" + "\n".join(validation_errors))
                     return
@@ -339,6 +347,7 @@ class RollerInfoPanel:
             success = self.db.update_roller(self.selected_roller_id, values)
             
             if success:
+                log_info("data", f"Roller '{values['roller_type']}' (ID: {self.selected_roller_id}) updated successfully")
                 messagebox.showinfo("Success", f"Roller '{values['roller_type']}' updated successfully!")
                 self.clear_fields()
                 self.selected_roller_id = None
@@ -348,33 +357,40 @@ class RollerInfoPanel:
                 # Set flag to refresh inference page roller list
                 self.app.roller_data_updated = True
             else:
+                log_error("data", f"Failed to update roller '{values['roller_type']}' (ID: {self.selected_roller_id}) - Database operation returned False")
                 messagebox.showerror("Error", "Failed to update roller.")
         
         except Exception as e:
+            log_error("data", f"Error updating roller (ID: {self.selected_roller_id})", e)
             print(f"❌ Error updating roller: {e}")
             messagebox.showerror("Error", f"Failed to update roller:\n{str(e)}")
     
     def delete_roller(self):
         """Delete the selected roller."""
-        if not self.selected_roller_id:
-            messagebox.showwarning("No Selection", 
-                                 "Please select a roller using the 'Read' button first.")
-            return
-        
-        # Confirm deletion
-        roller_type = self.entries['roller_type'].get().strip()
-        response = messagebox.askyesno("Confirm Deletion", 
-                                      f"Are you sure you want to delete roller '{roller_type}'?\n\n"
-                                      "This action cannot be undone.")
-        
-        if not response:
-            return
-        
         try:
+            log_info("data", f"Attempting to delete roller (ID: {self.selected_roller_id})")
+            
+            if not self.selected_roller_id:
+                log_warning("data", "Delete roller failed: No roller selected")
+                messagebox.showwarning("No Selection", 
+                                     "Please select a roller using the 'Read' button first.")
+                return
+            
+            # Confirm deletion
+            roller_type = self.entries['roller_type'].get().strip()
+            response = messagebox.askyesno("Confirm Deletion", 
+                                          f"Are you sure you want to delete roller '{roller_type}'?\n\n"
+                                          "This action cannot be undone.")
+            
+            if not response:
+                log_info("data", f"Roller deletion cancelled by user for '{roller_type}' (ID: {self.selected_roller_id})")
+                return
+            
             # Delete roller
             success = self.db.delete_roller(self.selected_roller_id)
             
             if success:
+                log_info("data", f"Roller '{roller_type}' (ID: {self.selected_roller_id}) deleted successfully")
                 messagebox.showinfo("Success", f"Roller '{roller_type}' deleted successfully!")
                 self.clear_fields()
                 self.selected_roller_id = None
@@ -384,9 +400,11 @@ class RollerInfoPanel:
                 # Set flag to refresh inference page roller list
                 self.app.roller_data_updated = True
             else:
+                log_error("data", f"Failed to delete roller '{roller_type}' (ID: {self.selected_roller_id}) - Database operation returned False")
                 messagebox.showerror("Error", "Failed to delete roller.")
         
         except Exception as e:
+            log_error("data", f"Error deleting roller (ID: {self.selected_roller_id})", e)
             print(f"❌ Error deleting roller: {e}")
             messagebox.showerror("Error", f"Failed to delete roller:\n{str(e)}")
     

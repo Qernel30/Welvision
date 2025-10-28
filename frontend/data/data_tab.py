@@ -5,6 +5,7 @@ Handles roller data management and global limits configuration
 
 import tkinter as tk
 from ..utils.styles import Colors, Fonts
+from ..utils.debug_logger import log_error, log_info
 from .global_limits_panel import GlobalLimitsPanel
 from .roller_info_panel import RollerInfoPanel
 from .roller_data_table import RollerDataTable
@@ -31,38 +32,47 @@ class DataTab:
         
     def setup(self):
         """Setup the data tab UI."""
-        # Main container
-        main_container = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
-        main_container.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
-        
-        # Header frame for title
-        header_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
-        header_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        # Title (centered)
-        title_label = tk.Label(
-            header_frame,
-            text="Roller Data Management",
-            font=("Arial", 20, "bold"),
-            fg=Colors.WHITE,
-            bg=Colors.PRIMARY_BG
-        )
-        title_label.pack()
-        
-        # Global Roller Limits Section (Super Admin Only)
-        self.global_limits_panel = GlobalLimitsPanel(main_container, self.app)
-        self.global_limits_panel.create()
-        
-        # Roller Information Section
-        self.roller_info_panel = RollerInfoPanel(main_container, self.app)
-        self.roller_info_panel.create()
-        
-        # Roller Data Table Section
-        self.roller_data_table = RollerDataTable(main_container, self.app)
-        self.roller_data_table.create()
-        
-        # Load initial data
-        self.refresh_data()
+        try:
+            log_info("data", "Setting up Data tab")
+            
+            # Main container
+            main_container = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
+            main_container.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
+            
+            # Header frame for title
+            header_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
+            header_frame.pack(fill=tk.X, pady=(0, 10))
+            
+            # Title (centered)
+            title_label = tk.Label(
+                header_frame,
+                text="Roller Data Management",
+                font=("Arial", 20, "bold"),
+                fg=Colors.WHITE,
+                bg=Colors.PRIMARY_BG
+            )
+            title_label.pack()
+            
+            # Global Roller Limits Section (Super Admin Only)
+            self.global_limits_panel = GlobalLimitsPanel(main_container, self.app)
+            self.global_limits_panel.create()
+            
+            # Roller Information Section
+            self.roller_info_panel = RollerInfoPanel(main_container, self.app)
+            self.roller_info_panel.create()
+            
+            # Roller Data Table Section
+            self.roller_data_table = RollerDataTable(main_container, self.app)
+            self.roller_data_table.create()
+            
+            # Load initial data
+            self.refresh_data()
+            
+            log_info("data", "Data tab setup completed")
+            
+        except Exception as e:
+            log_error("data", "Failed to setup Data tab", e)
+            raise
     
     def refresh_data(self):
         """Refresh all data from database."""

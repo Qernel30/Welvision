@@ -16,6 +16,7 @@ from .utils.config import AppConfig
 from .utils.helpers import center_window, create_header
 from .utils.db_error_handler import DatabaseErrorHandler
 from .utils.process_manager import ProcessManager, ThreadStopFlag
+from .utils.debug_logger import debug_logger, log_error, log_warning, log_info
 from .login import LoginPage
 from .navbar import NavBarManager
 from .inference import InferenceTab
@@ -213,7 +214,12 @@ class WelVisionApp(tk.Tk):
             connection.close()
             
         except Exception as e:
-            print(f"❌ Error loading latest models from database: {e}")
+            error_msg = f"❌ Error loading latest models from database: {e}"
+            print(error_msg)
+            log_error("startup", "Failed to load models from database", e, {
+                "DB_HOST": AppConfig.DB_HOST,
+                "DB_DATABASE": AppConfig.DB_DATABASE
+            })
             # No models available on error
             self.selected_bf_model_path = None
             self.selected_bf_model_name = "No Model Available"
@@ -328,12 +334,13 @@ class WelVisionApp(tk.Tk):
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Create header and store logout button reference
-        header_frame, self.logout_button = create_header(
+        header_frame, self.logout_button, self.debug_checkbutton = create_header(
             main_frame, 
             AppConfig.WINDOW_TITLE,
             self.current_user, 
             self.current_role, 
-            self.show_login_page
+            self.show_login_page,
+            self  # Pass app instance for debug toggle
         )
         
         # Create navigation bar
@@ -383,7 +390,8 @@ class WelVisionApp(tk.Tk):
         self.shared_data["system_mode"] = False 
         self.shared_data["system_ready"] = False 
         self.shared_data["disc_status"] = False 
-        self.shared_data["allow_all"] = False 
+        self.shared_data["allow_all"] = False
+        self.shared_data["debug_enabled"] = False  # For backend logging 
         
         # BF Defect Statistics (Inference)
         self.shared_data["bf_inspected"] = 0
@@ -528,85 +536,126 @@ class WelVisionApp(tk.Tk):
     
     def start_inspection(self):
         """Start the inspection process."""
-        if self.inspection_running:
-            print("Inspection is already running!")
-            return
+        page_name = getattr(self, 'current_tab_id', 'inference')
         
-        # Reset system error flag
-        if hasattr(self, 'shared_data'):
-            self.shared_data['system_error'] = False
-        
-        self.inspection_running = True
-        if self.inference_tab and self.inference_tab.control_panel:
-            self.inference_tab.control_panel.enable_stop()
-        
-        # Record start time
-        from datetime import datetime
-        self.inspection_start_time = datetime.now().time()
-        
-        # Recreate processes before starting
-        self.create_processes()
-        
-        # Start PLC process
-        if self.plc_process is not None:
-            self.plc_process.start()
-        
-        # Start subprocesses
-        for process in self.processes:
-            process.start()
-        
-        # Start monitoring for system errors
-        self._monitor_system_error()
+        try:
+            if self.inspection_running:
+                log_warning(page_name, "Attempted to start inspection while already running")
+                print("Inspection is already running!")
+                return
+            
+            log_info(page_name, "Starting inspection process")
+            
+            # Reset system error flag
+            if hasattr(self, 'shared_data'):
+                self.shared_data['system_error'] = False
+            
+            self.inspection_running = True
+            if self.inference_tab and self.inference_tab.control_panel:
+                self.inference_tab.control_panel.enable_stop()
+            
+            # Record start time
+            from datetime import datetime
+            self.inspection_start_time = datetime.now().time()
+            log_info(page_name, f"Inspection start time: {self.inspection_start_time}")
+            
+            # Recreate processes before starting
+            self.create_processes()
+            
+            # Start PLC process
+            if self.plc_process is not None:
+                self.plc_process.start()
+                log_info(page_name, "PLC process started")
+            
+            # Start subprocesses
+            for idx, process in enumerate(self.processes):
+                process.start()
+                log_info(page_name, f"Subprocess {idx+1}/{len(self.processes)} started")
+            
+            log_info(page_name, "✅ Inspection started successfully")
+            
+            # Start monitoring for system errors
+            self._monitor_system_error()
+            
+        except Exception as e:
+            log_error(page_name, "Failed to start inspection", e, {
+                "inspection_running": self.inspection_running,
+                "selected_bf_model": getattr(self, 'selected_bf_model_name', 'Unknown'),
+                "selected_od_model": getattr(self, 'selected_od_model_name', 'Unknown')
+            })
+            # Ensure inspection is stopped if error occurs
+            self.inspection_running = False
+            if self.inference_tab and self.inference_tab.control_panel:
+                self.inference_tab.control_panel.enable_start()
+            raise
         
     
     def stop_inspection(self):
         """Stop the inspection process with proper cleanup."""
-        if not self.inspection_running:
-            print("Inspection is not running.")
-            return
+        page_name = getattr(self, 'current_tab_id', 'inference')
         
-        # Turn off PLC lights
-        plc_client = snap7.client.Client() 
         try:
-            plc_client.connect(self.PLC_IP, self.RACK, self.SLOT)
+            if not self.inspection_running:
+                log_warning(page_name, "Attempted to stop inspection when not running")
+                print("Inspection is not running.")
+                return
             
-            data = plc_client.read_area(Areas.DB, self.DB_NUMBER, 0, 2)
-            set_bool(data, byte_index=1, bool_index=6, value=False)
-            set_bool(data, byte_index=1, bool_index=7, value=False)
-            plc_client.write_area(Areas.DB, self.DB_NUMBER, 0, data)
+            log_info(page_name, "Stopping inspection process")
             
-            plc_client.disconnect()
+            # Turn off PLC lights
+            plc_client = snap7.client.Client() 
+            try:
+                plc_client.connect(self.PLC_IP, self.RACK, self.SLOT)
+                
+                data = plc_client.read_area(Areas.DB, self.DB_NUMBER, 0, 2)
+                set_bool(data, byte_index=1, bool_index=6, value=False)
+                set_bool(data, byte_index=1, bool_index=7, value=False)
+                plc_client.write_area(Areas.DB, self.DB_NUMBER, 0, data)
+                
+                plc_client.disconnect()
+                log_info(page_name, "PLC lights turned off")
+            except Exception as e:
+                log_error(page_name, "Failed to turn off PLC lights", e, {
+                    "PLC_IP": self.PLC_IP,
+                    "RACK": self.RACK,
+                    "SLOT": self.SLOT
+                })
+            
+            self.inspection_running = False
+            if self.inference_tab and self.inference_tab.control_panel:
+                self.inference_tab.control_panel.enable_start()
+            
+            # Use process manager to stop all inference processes
+            self.process_manager.stop_all_inference()
+            log_info(page_name, "All inference processes stopped")
+            
+            # Clean up GPU memory
+            self.process_manager.cleanup_gpu_memory()
+            log_info(page_name, "GPU memory cleaned up")
+            
+            # Clear process references
+            self.plc_process = None
+            self.processes = []
+            
+            # Clean up camera feeds to release image memory
+            if hasattr(self, 'inference_tab') and self.inference_tab:
+                if hasattr(self.inference_tab, 'camera_manager') and self.inference_tab.camera_manager:
+                    for feed_id in ['bf', 'od']:
+                        feed = self.inference_tab.camera_manager.get_feed(feed_id)
+                        if feed and hasattr(feed, 'cleanup'):
+                            feed.cleanup()
+            
+            # Force garbage collection to free memory
+            import gc
+            gc.collect()
+            
+            # Small delay to ensure processes are fully stopped
+            time.sleep(0.3)
+            
+            log_info(page_name, "✅ Inspection stopped successfully")
+            
         except Exception as e:
-            print(f"❌ PLC Communication: Failed to connect to PLC. Error: {e}")
-        
-        self.inspection_running = False
-        if self.inference_tab and self.inference_tab.control_panel:
-            self.inference_tab.control_panel.enable_start()
-        
-        # Use process manager to stop all inference processes
-        self.process_manager.stop_all_inference()
-        
-        # Clean up GPU memory
-        self.process_manager.cleanup_gpu_memory()
-        
-        # Clear process references
-        self.plc_process = None
-        self.processes = []
-        
-        # Clean up camera feeds to release image memory
-        if hasattr(self, 'inference_tab') and self.inference_tab:
-            if hasattr(self.inference_tab, 'camera_manager') and self.inference_tab.camera_manager:
-                for feed_id in ['bf', 'od']:
-                    feed = self.inference_tab.camera_manager.get_feed(feed_id)
-                    if feed and hasattr(feed, 'cleanup'):
-                        feed.cleanup()
-        
-        # Force garbage collection to free memory
-        import gc
-        gc.collect()
-        
-        # Small delay to ensure processes are fully stopped
-        time.sleep(0.3)
+            log_error(page_name, "Error during inspection stop", e)
             
     def on_nav_change(self, button_id):
         """
@@ -627,91 +676,143 @@ class WelVisionApp(tk.Tk):
         # Track current tab
         self.current_tab_id = tab_id
         
+        # Update debug checkbox state for current page
+        if hasattr(self, 'debug_var') and hasattr(self, 'debug_checkbutton'):
+            is_enabled = debug_logger.is_enabled(tab_id)
+            self.debug_var.set(is_enabled)
+            if is_enabled:
+                self.debug_checkbutton.config(fg="#00ff00")  # Green when enabled
+            else:
+                self.debug_checkbutton.config(fg=Colors.WHITE)  # White when disabled
+        
         # Set current page for error handler and reset error flag
         DatabaseErrorHandler.set_current_page(tab_id)
         
-        # Store reference to previous settings tab if it exists and has active preview
-        previous_settings_tab = None
-        if hasattr(self, 'settings_tab') and self.settings_tab is not None:
-            if hasattr(self.settings_tab, 'preview_active') and self.settings_tab.preview_active:
-                # Keep reference to preserve state
-                previous_settings_tab = self.settings_tab
-            elif tab_id != "settings":
-                # Cleanup settings tab when navigating away (no active preview)
+        # Log page navigation if debug is enabled
+        log_info(tab_id, f"Navigated to {tab_id} page")
+        
+        try:
+            # Store reference to previous settings tab if it exists and has active preview
+            previous_settings_tab = None
+            if hasattr(self, 'settings_tab') and self.settings_tab is not None:
+                if hasattr(self.settings_tab, 'preview_active') and self.settings_tab.preview_active:
+                    # Keep reference to preserve state
+                    previous_settings_tab = self.settings_tab
+                elif tab_id != "settings":
+                    # Cleanup settings tab when navigating away (no active preview)
+                    try:
+                        if hasattr(self.settings_tab, 'cleanup'):
+                            self.settings_tab.cleanup()
+                    except Exception as e:
+                        log_error(tab_id, "Failed to cleanup settings tab", e)
+            
+            # Cleanup info tab when navigating away
+            if hasattr(self, 'info_tab') and self.info_tab is not None and tab_id != "info":
                 try:
-                    if hasattr(self.settings_tab, 'cleanup'):
-                        self.settings_tab.cleanup()
-                except:
-                    pass
+                    if hasattr(self.info_tab, 'cleanup'):
+                        self.info_tab.cleanup()
+                except Exception as e:
+                    log_error(tab_id, "Failed to cleanup info tab", e)
+            
+            # Clear current tab content - use destroy_later for smoother transition
+            if self.current_tab_frame:
+                old_frame = self.current_tab_frame
+                # Schedule destruction after new frame is created
+                self.after(10, lambda: old_frame.destroy() if old_frame.winfo_exists() else None)
+            
+            # Create new tab frame
+            self.current_tab_frame = tk.Frame(self.content_frame, bg=Colors.PRIMARY_BG)
+            self.current_tab_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # Setup the appropriate tab with error handling
+            self._setup_tab_content(tab_id, previous_settings_tab)
+            
+            # Update navbar active state
+            if self.navbar_manager:
+                self.navbar_manager.set_active_button(tab_id)
+                
+        except Exception as e:
+            log_error(tab_id, f"Failed to show {tab_id} tab", e, {
+                "current_user": self.current_user,
+                "current_role": self.current_role
+            })
+            # Show error to user
+            import tkinter.messagebox as messagebox
+            messagebox.showerror(
+                "Tab Load Error",
+                f"Failed to load {tab_id} tab.\n\nError: {str(e)}\n\n"
+                f"Check debug logs for details."
+            )
+    
+    def _setup_tab_content(self, tab_id, previous_settings_tab=None):
+        """
+        Setup tab content with error handling for each tab.
         
-        # Cleanup info tab when navigating away
-        if hasattr(self, 'info_tab') and self.info_tab is not None and tab_id != "info":
-            try:
-                if hasattr(self.info_tab, 'cleanup'):
-                    self.info_tab.cleanup()
-            except:
-                pass
-        
-        # Clear current tab content - use destroy_later for smoother transition
-        if self.current_tab_frame:
-            old_frame = self.current_tab_frame
-            # Schedule destruction after new frame is created
-            self.after(10, lambda: old_frame.destroy() if old_frame.winfo_exists() else None)
-        
-        # Create new tab frame
-        self.current_tab_frame = tk.Frame(self.content_frame, bg=Colors.PRIMARY_BG)
-        self.current_tab_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Setup the appropriate tab
-        if tab_id == "inference":
-            self.inference_tab = InferenceTab(self.current_tab_frame, self)
-            self.inference_tab.setup()
-            # Restart camera feeds if they were running
-            if self.camera_running:
-                self.start_camera_feeds()
-        
-        elif tab_id == "data":
-            self.data_tab = DataTab(self.current_tab_frame, self)
-            self.data_tab.setup()
-        
-        elif tab_id == "diagnosis":
-            self.diagnosis_tab = DiagnosisTab(self.current_tab_frame, self)
-            self.diagnosis_tab.setup()
-        
-        elif tab_id == "settings":
-            # If we have a previous settings tab with active preview, restore it
-            if previous_settings_tab is not None:
-                self.settings_tab = previous_settings_tab
-                self.settings_tab.parent = self.current_tab_frame
-                self.settings_tab.setup()
-            else:
-                # Create fresh settings tab instance
-                self.settings_tab = SettingsTab(self.current_tab_frame, self)
-                self.settings_tab.setup()
-        
-        elif tab_id == "model_management":
-            self.model_management_tab = ModelManagementTab(self.current_tab_frame, self)
-            self.model_management_tab.setup()
-        
-        elif tab_id == "user_management":
-            self.user_management_tab = UserManagementTab(self.current_tab_frame, self)
-            self.user_management_tab.setup()
-        
-        elif tab_id == "system_check":
-            self.system_check_tab = SystemCheckTab(self.current_tab_frame, self)
-            self.system_check_tab.setup()
-        
-        elif tab_id == "backup":
-            self.backup_tab = BackupTab(self.current_tab_frame, self)
-            self.backup_tab.setup()
-        
-        elif tab_id == "info":
-            self.info_tab = InfoTab(self.current_tab_frame, self)
-            self.info_tab.setup()
-        
-        # Update navbar active state
-        if self.navbar_manager:
-            self.navbar_manager.set_active_button(tab_id)
+        Args:
+            tab_id: ID of the tab to setup
+            previous_settings_tab: Previous settings tab instance (if restoring)
+        """
+        try:
+            if tab_id == "inference":
+                log_info(tab_id, "Setting up Inference tab")
+                self.inference_tab = InferenceTab(self.current_tab_frame, self)
+                self.inference_tab.setup()
+                # Restart camera feeds if they were running
+                if self.camera_running:
+                    self.start_camera_feeds()
+            
+            elif tab_id == "data":
+                log_info(tab_id, "Setting up Data tab")
+                self.data_tab = DataTab(self.current_tab_frame, self)
+                self.data_tab.setup()
+            
+            elif tab_id == "diagnosis":
+                log_info(tab_id, "Setting up Diagnosis tab")
+                self.diagnosis_tab = DiagnosisTab(self.current_tab_frame, self)
+                self.diagnosis_tab.setup()
+            
+            elif tab_id == "settings":
+                log_info(tab_id, "Setting up Settings tab")
+                # If we have a previous settings tab with active preview, restore it
+                if previous_settings_tab is not None:
+                    self.settings_tab = previous_settings_tab
+                    self.settings_tab.parent = self.current_tab_frame
+                    self.settings_tab.setup()
+                else:
+                    # Create fresh settings tab instance
+                    self.settings_tab = SettingsTab(self.current_tab_frame, self)
+                    self.settings_tab.setup()
+            
+            elif tab_id == "model_management":
+                log_info(tab_id, "Setting up Model Management tab")
+                self.model_management_tab = ModelManagementTab(self.current_tab_frame, self)
+                self.model_management_tab.setup()
+            
+            elif tab_id == "user_management":
+                log_info(tab_id, "Setting up User Management tab")
+                self.user_management_tab = UserManagementTab(self.current_tab_frame, self)
+                self.user_management_tab.setup()
+            
+            elif tab_id == "system_check":
+                log_info(tab_id, "Setting up System Check tab")
+                self.system_check_tab = SystemCheckTab(self.current_tab_frame, self)
+                self.system_check_tab.setup()
+            
+            elif tab_id == "backup":
+                log_info(tab_id, "Setting up Backup tab")
+                self.backup_tab = BackupTab(self.current_tab_frame, self)
+                self.backup_tab.setup()
+            
+            elif tab_id == "info":
+                log_info(tab_id, "Setting up Info tab")
+                self.info_tab = InfoTab(self.current_tab_frame, self)
+                self.info_tab.setup()
+            
+            log_info(tab_id, f"{tab_id} tab setup completed successfully")
+            
+        except Exception as e:
+            log_error(tab_id, f"Error during {tab_id} tab setup", e)
+            raise  # Re-raise to be caught by show_tab
     
     def _show_placeholder_tab(self, title, description):
         """

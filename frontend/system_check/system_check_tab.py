@@ -5,6 +5,7 @@ Professional interface for BigFace and OD roller inspection control
 
 import tkinter as tk
 from ..utils.styles import Colors, Fonts
+from ..utils.debug_logger import log_error, log_warning, log_info
 from .control_settings import ControlSettings
 from .system_status import SystemStatus
 from .processing_counters import ProcessingCounters
@@ -48,72 +49,80 @@ class SystemCheckTab:
         
     def setup(self):
         """Setup the system check tab UI."""
-        # Save the current running state before rebuilding UI
-        was_running = self.system_running
-        
-        # Main container with dark blue background
-        main_container = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
-        main_container.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
-        
-        # Title Section
-        title_label = tk.Label(
-            main_container,
-            text="System Check - PLC Control Interface",
-            font=("Arial", 20, "bold"),
-            fg=Colors.WHITE,
-            bg=Colors.PRIMARY_BG
-        )
-        title_label.pack(pady=(0, 2))
-        
-        # Subtitle
-        subtitle_label = tk.Label(
-            main_container,
-            text="Professional interface for BigFace and OD roller inspection control",
-            font=("Arial", 9),
-            fg="#CCCCCC",
-            bg=Colors.PRIMARY_BG
-        )
-        subtitle_label.pack(pady=(0, 10))
-        
-        # Control Settings Section - preserve disabled state if system was running
-        # Use the SystemCheckTab's own flag, not the old ControlSettings instance
-        controls_disabled = self.controls_are_disabled
-        
-        self.control_settings = ControlSettings(main_container, self.app)
-        self.control_settings.controls_disabled = controls_disabled  # Set before create()
-        self.control_settings.create()
-        
-        # Initialize PLC Controller only if not already initialized
-        if self.plc_controller is None:
-            self.plc_controller = PLCController(self.app, self.control_settings)
-        else:
-            # Update the control_settings reference in existing PLC controller
-            self.plc_controller.control_settings = self.control_settings
-        
-        # System Status Section
-        self.system_status = SystemStatus(main_container, self.app, self)
-        self.system_status.create()
-        
-        # Processing Counters Section
-        self.processing_counters = ProcessingCounters(main_container, self.app)
-        self.processing_counters.create()
-        
-        # System Control Section
-        self.system_control = SystemControl(main_container, self.app, self)
-        self.system_control.create()
-        
-        # Restore button states if system is running
-        if was_running:
-            # Button states are already handled in create(), just update colors
-            self.system_control.enable_stop()
-            # Control settings are already disabled via controls_disabled flag
-            self._block_navigation_buttons()
-            # Also restore app closing block
-            if hasattr(self.app, 'protocol'):
-                self.app.protocol("WM_DELETE_WINDOW", self.system_control._block_closing)
-        
-        # Start monitoring updates
-        self._monitor_updates()
+        try:
+            log_info("system_check", "Setting up System Check tab")
+            
+            # Save the current running state before rebuilding UI
+            was_running = self.system_running
+            
+            # Main container with dark blue background
+            main_container = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
+            main_container.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
+            
+            # Title Section
+            title_label = tk.Label(
+                main_container,
+                text="System Check - PLC Control Interface",
+                font=("Arial", 20, "bold"),
+                fg=Colors.WHITE,
+                bg=Colors.PRIMARY_BG
+            )
+            title_label.pack(pady=(0, 2))
+            
+            # Subtitle
+            subtitle_label = tk.Label(
+                main_container,
+                text="Professional interface for BigFace and OD roller inspection control",
+                font=("Arial", 9),
+                fg="#CCCCCC",
+                bg=Colors.PRIMARY_BG
+            )
+            subtitle_label.pack(pady=(0, 10))
+            
+            # Control Settings Section - preserve disabled state if system was running
+            # Use the SystemCheckTab's own flag, not the old ControlSettings instance
+            controls_disabled = self.controls_are_disabled
+            
+            self.control_settings = ControlSettings(main_container, self.app)
+            self.control_settings.controls_disabled = controls_disabled  # Set before create()
+            self.control_settings.create()
+            
+            # Initialize PLC Controller only if not already initialized
+            if self.plc_controller is None:
+                self.plc_controller = PLCController(self.app, self.control_settings)
+            else:
+                # Update the control_settings reference in existing PLC controller
+                self.plc_controller.control_settings = self.control_settings
+            
+            # System Status Section
+            self.system_status = SystemStatus(main_container, self.app, self)
+            self.system_status.create()
+            
+            # Processing Counters Section
+            self.processing_counters = ProcessingCounters(main_container, self.app)
+            self.processing_counters.create()
+            
+            # System Control Section
+            self.system_control = SystemControl(main_container, self.app, self)
+            self.system_control.create()
+            
+            # Restore button states if system is running
+            if was_running:
+                # Button states are already handled in create(), just update colors
+                self.system_control.enable_stop()
+                # Control settings are already disabled via controls_disabled flag
+                self._block_navigation_buttons()
+                # Also restore app closing block
+                if hasattr(self.app, 'protocol'):
+                    self.app.protocol("WM_DELETE_WINDOW", self.system_control._block_closing)
+            
+            # Start monitoring updates
+            self._monitor_updates()
+            
+            log_info("system_check", "System Check tab setup completed successfully")
+        except Exception as e:
+            log_error("system_check", "Failed to setup System Check tab", e)
+            raise
     
     def _monitor_updates(self):
         """Monitor shared_data for real-time updates."""

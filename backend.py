@@ -10,6 +10,7 @@ from ultralytics import YOLO
 import torch
 from datetime import datetime
 from frontend.utils.config import AppConfig
+from frontend.utils.debug_logger import log_error, log_warning, log_info
 import psutil
 
 def set_priority_high():
@@ -296,10 +297,16 @@ def plc_communication(plc_ip, rack, slot, db_number, shared_data, command_queue)
     Handles all PLC communication: reading sensor statuses and executing commands.
     """
     set_priority_below_normal()
+    
+    # Enable debug logging if frontend has it enabled
+    if shared_data.get('debug_enabled', False):
+        from frontend.utils.debug_logger import enable_debug
+        enable_debug('inference')
 
     plc_client = snap7.client.Client()
     try:
         plc_client.connect(plc_ip, rack, slot)
+        log_info("inference", f"PLC connected successfully to {plc_ip}")
         print("✅ PLC Communication: Connected to PLC.")
         while True:
             if shared_data.get('bf_ready', False) and shared_data.get('od_ready', False):
@@ -357,6 +364,7 @@ def plc_communication(plc_ip, rack, slot, db_number, shared_data, command_queue)
 
     except Exception as e:
         print(f"PLC Communication: Error during operation: {e} ⚠")
+        log_error("inference", f"PLC connection failed to {plc_ip}", e)
         shared_data["system_error"] = True
 
     finally:
@@ -381,12 +389,18 @@ def trigger_plc_action(plc_client, db_number, byte_index, bool_index, action):
 def capture_frames_bigface(shared_frame_bigface, frame_lock_bigface, frame_shape, shared_data):
     """Continuously capture frames from the camera."""
     set_priority_above_normal()
+    
+    # Enable debug logging if frontend has it enabled
+    if shared_data.get('debug_enabled', False):
+        from frontend.utils.debug_logger import enable_debug
+        enable_debug('inference')
 
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 960)
 
     if not cap.isOpened():
+        log_error("inference", "Failed to open BF camera")
         print("Failed to open camera.")
         sys.exit(1)
 
@@ -398,6 +412,7 @@ def capture_frames_bigface(shared_frame_bigface, frame_lock_bigface, frame_shape
                     np_frame = np.frombuffer(shared_frame_bigface.get_obj(), dtype=np.uint8).reshape(frame_shape)
                     np.copyto(np_frame, frame)
             else:
+                log_error("inference", "Failed to capture frame from BF camera")
                 print("Failed to capture frame.")
                 shared_data["system_error"] = True
                 time.sleep(0.1)
@@ -410,6 +425,11 @@ def capture_frames_bigface(shared_frame_bigface, frame_lock_bigface, frame_shape
 def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_queue_bigface, model_bigface_path, proximity_count_bigface, roller_updation_dict, queue_lock, shared_data, frame_shape, shared_annotated_bigface, annotated_frame_lock_bigface):
     """Process frames for YOLO inference."""
     set_priority_high()
+    
+    # Enable debug logging if frontend has it enabled
+    if shared_data.get('debug_enabled', False):
+        from frontend.utils.debug_logger import enable_debug
+        enable_debug('inference')
 
     detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\BF\\Defect\\{datetime.now().strftime('%d_%B_%Y_%H_%M')}"
     os.makedirs(detected_folder, exist_ok=True)
@@ -431,7 +451,8 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
             print("BF Model loaded in GPU")
 
             configure_gpu_for_background()
-    except:
+    except Exception as e:
+        log_error("inference", "Failed to load BF model", e)
         print("Model is not loaded exiting process")
         return
         
@@ -448,16 +469,20 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
         for i in range(30):  # Process 30 warmup frames
             results = model_bf.predict(warmup_frame, device=0, conf=1, verbose=False)
         print("Warmup image YOLO processing for bigface complete.")
+        log_info("inference", "BF model warmup completed successfully")
         shared_data["bf_ready"] = True
     except Exception as e:
+        log_error("inference", "BF model warmup failed", e)
         print(f"Error during YOLO inference on warmup image: {e}")
 
     try:
         for i in range(30):  # Process 30 warmup frames
             results = model_head.predict(warmup_frame, device=0, conf=0.5, verbose=False)
+        log_info("inference", "Head classification model warmup completed") 
         print("Head Model Processed on Warmup Frame ")
 
     except Exception as e:
+        log_error("inference", "Head classification model warmup failed", e)
         print(f"Error during head classification model inference: {e}")
 
     def point_inside(rectangle, list_of_all_rollers , roller_number):
@@ -525,6 +550,7 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
                 bf_triggered = True
                 roller_dict[roller_id_counter] = {'defect': False , 'defect_names': ["No defect"]}
                 shared_data["bf_inspected"] += 1
+                log_info("inference", f"BF roller detected. Assigned Roller ID: {roller_id_counter}")
                 print(f"\n🎯 BF New roller detected! Assigned Roller ID: {roller_id_counter}")
 
             current_head_state = shared_data["head_classification"]
@@ -560,7 +586,8 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
                     head_type = "Down Head"
                 else:
                     head_type = "Normal"
-                
+
+                log_info("inference", f"HEAD TYPE: {head_type}, Roller ID: {roller_id_counter}")
                 print(f"HEAD TYPE: {head_type}, Roller ID: {roller_id_counter}")
                 if head_type == "High Head" or head_type == "Down Head":
                     data = roller_dict[roller_id_counter]["defect"] | True
@@ -674,8 +701,10 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
                         defect_names = roller_data['defect_names']
 
                         if defect_detected:
+                            log_info("inference", f"Defect detected for Roller ID: {first_key}")
                             shared_data["bf_not_ok_rollers"] += 1
                         else:
+                            log_info("inference", f"No defect for Roller ID: {first_key}")
                             shared_data["bf_ok_rollers"] += 1
                             if shared_data.get("od_inspected") is not None:
                                 shared_data["od_inspected"] += 1
@@ -708,6 +737,8 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
             previous_bf_state = current_bf_state
 
     except Exception as e:
+        log_error("inference", "Error in BF roller processing", e)
+        print(f"BF Roller Processing Error: {e}")
         shared_data["system_error"] = True
         
 
@@ -716,6 +747,11 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
 def handle_slot_control_bigface(roller_queue_bigface,shared_data,command_queue):
     """Control slot mechanism based on second proximity sensor."""
     set_priority_below_normal()
+    
+    # Enable debug logging if frontend has it enabled
+    if shared_data.get('debug_enabled', False):
+        from frontend.utils.debug_logger import enable_debug
+        enable_debug('inference')
 
     global roller_number
 
@@ -732,17 +768,24 @@ def handle_slot_control_bigface(roller_queue_bigface,shared_data,command_queue):
                 a = False
     except Exception as e:
         print(f"Slot Control Error: {e}")
+        log_error("inference", "Error in slot control", e)
         shared_data["system_error"] = True
 
 def capture_frames_od(shared_frame_od, frame_lock_od, frame_shape, shared_data):
     """Continuously capture frames from the camera."""
     set_priority_above_normal()
     
+    # Enable debug logging if frontend has it enabled
+    if shared_data.get('debug_enabled', False):
+        from frontend.utils.debug_logger import enable_debug
+        enable_debug('inference')
+    
     cap = cv2.VideoCapture(1)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, frame_shape[1])
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_shape[0])
 
     if not cap.isOpened():
+        log_error("inference", "Failed to open OD camera")
         print("Failed to open camera.")
         return
 
@@ -755,6 +798,7 @@ def capture_frames_od(shared_frame_od, frame_lock_od, frame_shape, shared_data):
                     np_frame = np.frombuffer(shared_frame_od.get_obj(), dtype=np.uint8).reshape(frame_shape)
                     np.copyto(np_frame, frame)
             else:
+                log_error("inference", "Failed to capture frame from OD camera")  # ADD THIS
                 print("Failed to capture frame.")
                 shared_data["system_error"] = True
                 time.sleep(0.01)
@@ -765,6 +809,11 @@ def capture_frames_od(shared_frame_od, frame_lock_od, frame_shape, shared_data):
 def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_path, queue_lock, shared_data, frame_shape, roller_updation_dict,shared_annotated_od, annotated_frame_lock_od):
     """Process frames for YOLO inference and track roller defects with pulse debounce & proper exit handling."""
     set_priority_high()
+    
+    # Enable debug logging if frontend has it enabled
+    if shared_data.get('debug_enabled', False):
+        from frontend.utils.debug_logger import enable_debug
+        enable_debug('inference')
 
     detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\OD\\Defect\\{datetime.now().strftime('%d_%B_%Y_%H_%M')}"
     os.makedirs(detected_folder, exist_ok=True)
@@ -788,19 +837,26 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
                 return idx
         return 0
 
+    try:
 
-    od_model = YOLO(model_od_path).to("cuda")
-    print("OD Model loaded in GPU")
-    configure_gpu_for_background()
+        od_model = YOLO(model_od_path).to("cuda")
+        print("OD Model loaded in GPU")
+        configure_gpu_for_background()
+    except Exception as e:
+        log_error("inference", "Failed to load OD model", e)
+        print("Model is not loaded exiting process")
+        return
 
     warmup_frame = r"Warmup OD.jpg"
     try:
         for i in range(30):  # Process 30 warmup frames
             od_model.predict(warmup_frame, device=0, conf=0.2, verbose=False)
         print("Warmup image YOLO processing for od complete.")
+        log_info("inference", "Warmup image YOLO processing for od complete.")
         shared_data["od_ready"] = True
     except Exception as e:
         print(f"Error during YOLO inference on warmup image: {e}")
+        log_error("inference", "Error during YOLO inference on warmup image", e)
 
     roller_dict = {}  
     previous_od_state = False
@@ -840,6 +896,7 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
                 roller_id_counter += 1
                 
                 roller_dict[roller_id_counter] = {'defect': False , 'defect_names': ["No defect"]}
+                log_info("inference", f"OD roller detected. Assigned Roller ID: {roller_id_counter}")
                 print(f"\n🎯 OD New roller detected! Assigned Roller ID: {roller_id_counter}")
 
             if od_triggered:
@@ -918,8 +975,10 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
                             defect_names = roller_data['defect_names']
 
                             if defect_detected:
+                                log_info("inference", f"Defect detected for Roller ID: {first_key}")
                                 shared_data["od_not_ok_rollers"] += 1
                             else:
+                                log_info("inference", f"No defect for Roller ID: {first_key}")
                                 shared_data["od_ok_rollers"] += 1
 
                             unique_defects = set(defect_names)
@@ -951,11 +1010,18 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
 
             previous_od_state = current_od_state
     except Exception as e:
+        log_error("inference", "Error in OD roller processing", e)
+        print(f"OD Roller Processing Error: {e}")
         shared_data["system_error"] = True
 
 def handle_slot_control_od(roller_queue_od, shared_data, command_queue):
     """Control slot mechanism based on second proximity sensor."""
     set_priority_below_normal()
+    
+    # Enable debug logging if frontend has it enabled
+    if shared_data.get('debug_enabled', False):
+        from frontend.utils.debug_logger import enable_debug
+        enable_debug('inference')
 
     try:
         processing = False
@@ -973,4 +1039,5 @@ def handle_slot_control_od(roller_queue_od, shared_data, command_queue):
                 processing = False
     except Exception as e:
         print(f"Slot Control Error: {e}")
+        log_error("inference", "Error in slot control", e)
         shared_data["system_error"] = True    

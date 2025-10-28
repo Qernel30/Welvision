@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import messagebox
 import os
 from ..utils.styles import Colors, Fonts
+from ..utils.debug_logger import log_error, log_warning, log_info
 from .model_database import ModelDatabase
 from .model_details_dialog import ModelDetailsDialog
 
@@ -59,26 +60,30 @@ class ModelActions:
     
     def _delete_model(self):
         """Delete selected model."""
-        model = self.tab.get_selected_model()
-        
-        if not model:
-            messagebox.showwarning("No Selection", "Please select a model to delete!")
-            return
-        
-        # Confirm deletion
-        confirm = messagebox.askyesno(
-            "Confirm Deletion",
-            f"Are you sure you want to delete the model:\n\n"
-            f"Name: {model['model_name']}\n"
-            f"Type: {model['model_type']}\n\n"
-            f"This will remove the database entry and delete the model file.\n"
-            f"This action cannot be undone!"
-        )
-        
-        if not confirm:
-            return
-        
         try:
+            model = self.tab.get_selected_model()
+            
+            if not model:
+                log_warning("model_management", "Delete model failed: No model selected")
+                messagebox.showwarning("No Selection", "Please select a model to delete!")
+                return
+            
+            log_info("model_management", f"Attempting to delete model - Name: {model['model_name']}, Type: {model['model_type']}, ID: {model['id']}")
+            
+            # Confirm deletion
+            confirm = messagebox.askyesno(
+                "Confirm Deletion",
+                f"Are you sure you want to delete the model:\n\n"
+                f"Name: {model['model_name']}\n"
+                f"Type: {model['model_type']}\n\n"
+                f"This will remove the database entry and delete the model file.\n"
+                f"This action cannot be undone!"
+            )
+            
+            if not confirm:
+                log_info("model_management", f"Model deletion cancelled by user - {model['model_name']}")
+                return
+            
             # Delete from database
             db = ModelDatabase()
             if db.connect():
@@ -90,9 +95,12 @@ class ModelActions:
                     try:
                         if os.path.exists(model['model_path']):
                             os.remove(model['model_path'])
+                            log_info("model_management", f"Model file deleted from disk: {model['model_path']}")
                     except Exception as e:
+                        log_warning("model_management", f"Could not delete model file from disk: {model['model_path']}", e)
                         print(f"⚠ Warning: Could not delete file: {e}")
                     
+                    log_info("model_management", f"Model '{model['model_name']}' (ID: {model['id']}) deleted successfully")
                     messagebox.showinfo(
                         "Success",
                         f"Model '{model['model_name']}' deleted successfully!"
@@ -105,11 +113,14 @@ class ModelActions:
                     if hasattr(self.tab, 'app'):
                         self.tab.app.reload_models_and_notify_tabs()
                 else:
+                    log_error("model_management", f"Failed to delete model '{model['model_name']}' from database")
                     messagebox.showerror("Error", "Failed to delete model from database!")
             else:
+                log_error("model_management", f"Failed to connect to database for model deletion - {model['model_name']}")
                 messagebox.showerror("Error", "Failed to connect to database!")
                 
         except Exception as e:
+            log_error("model_management", f"Error deleting model", e)
             messagebox.showerror("Error", f"Failed to delete model:\n{str(e)}")
             print(f"❌ Delete error: {e}")
             import traceback

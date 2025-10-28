@@ -18,6 +18,7 @@ from multiprocessing import Process
 from ..utils.styles import Colors, Fonts
 from ..utils.config import AppConfig
 from ..utils.process_manager import ThreadStopFlag
+from ..utils.debug_logger import log_error, log_warning, log_info
 from .preview_camera_feed import PreviewCameraManager
 from .preview_control_panel import PreviewControlPanel
 from .model_selector import ModelSelector
@@ -401,6 +402,8 @@ class SettingsTab:
     def save_settings(self):
         """Save the current settings to database and apply to inference."""
         try:
+            log_info("settings", "Saving threshold settings")
+            
             # Get current user
             employee_id = self.app.current_user if hasattr(self.app, 'current_user') else "unknown"
             
@@ -443,38 +446,51 @@ class SettingsTab:
                 self.app.update_model_confidence()
             
             if bf_success and od_success:
+                log_info("settings", f"Settings saved successfully by {employee_id}")
                 messagebox.showinfo("Settings Saved", 
                                   "Threshold settings have been saved to database successfully.")
             else:
+                log_warning("settings", "Partial save - some settings could not be saved")
                 messagebox.showwarning("Partial Save", 
                                      "Some settings could not be saved to database.")
         
         except Exception as e:
+            log_error("settings", "Failed to save settings", e, {
+                "user": getattr(self.app, 'current_user', 'unknown'),
+                "bf_model": getattr(self.app, 'selected_bf_model_name', 'Unknown'),
+                "od_model": getattr(self.app, 'selected_od_model_name', 'Unknown')
+            })
             print(f"❌ Error saving settings: {e}")
             messagebox.showerror("Save Error", f"Failed to save settings:\n{str(e)}")
     
     def start_preview(self):
         """Start the camera preview with model inference."""
         if self.preview_active:
+            log_warning("settings", "Attempted to start preview while already running")
             print("Preview already running!")
             return False
+        
+        log_info("settings", "Starting camera preview")
         
         # ===== VALIDATION CHECKS BEFORE PREVIEW =====
         # 1. Check if models are available
         models_ok, models_error = self._check_models_available()
         if not models_ok:
+            log_warning("settings", f"Models check failed: {models_error}")
             messagebox.showerror("Models Check Failed", models_error)
             return False
         
         # 2. Check PLC connection
         plc_ok, plc_error = self._check_plc_connection()
         if not plc_ok:
+            log_warning("settings", f"PLC check failed: {plc_error}")
             messagebox.showerror("PLC Check Failed", plc_error)
             return False
         
         # 3. Check cameras
         cameras_ok, cameras_error = self._check_cameras_connected()
         if not cameras_ok:
+            log_warning("settings", f"Camera check failed: {cameras_error}")
             messagebox.showerror("Camera Check Failed", cameras_error)
             return False
         
@@ -486,6 +502,7 @@ class SettingsTab:
         
         # Check if models are available
         if not bf_model_path or not od_model_path:
+            log_warning("settings", "Models not available for preview")
             messagebox.showerror(
                 "Models Not Available", 
                 "⚠️ Cannot start preview\n\n"
@@ -503,6 +520,7 @@ class SettingsTab:
         
         # Load models
         try:
+            log_info("settings", f"Loading models - BF: {bf_model_path}, OD: {od_model_path}")
             self.preview_bf_model = YOLO(bf_model_path)
             if torch.cuda.is_available():
                 self.preview_bf_model.to("cuda")
@@ -510,8 +528,14 @@ class SettingsTab:
             self.preview_od_model = YOLO(od_model_path)
             if torch.cuda.is_available():
                 self.preview_od_model.to("cuda")
+            
+            log_info("settings", "Models loaded successfully")
                 
         except Exception as e:
+            log_error("settings", "Failed to load models for preview", e, {
+                "bf_model_path": bf_model_path,
+                "od_model_path": od_model_path
+            })
             messagebox.showerror("Model Load Error", f"Failed to load models:\n{str(e)}")
             print(f"❌ Error loading models: {e}")
             return False
@@ -554,85 +578,100 @@ class SettingsTab:
     
     def stop_preview(self):
         """Stop the camera preview with save/discard option and proper cleanup."""
-        if not self.preview_active:
-            print("Preview is not running.")
-            return
-        
-        # Check if thresholds were changed
-        if self._thresholds_changed():
-            # Ask user: Save or Don't Save
-            response = messagebox.askyesnocancel(
-                "Save Threshold Changes?",
-                "Threshold values have been modified.\n\n"
-                "Do you want to save these changes to the database?\n\n"
-                "Yes: Save changes\n"
-                "No: Discard changes (restore previous values)\n"
-                "Cancel: Continue preview"
-            )
+        try:
+            log_info("settings", "Attempting to stop camera preview")
             
-            if response is None:  # Cancel - continue preview
+            if not self.preview_active:
+                log_warning("settings", "Stop preview called but preview is not running")
+                print("Preview is not running.")
                 return
-            elif response:  # Yes - save changes
-                self.save_settings()
-            else:  # No - restore previous values
-                self._restore_threshold_snapshot()
-        
-        # Turn off PLC lights
-        plc_client = snap7.client.Client()
-        plc_client.connect("172.17.8.17", 0, 1)        
-        data = plc_client.read_area(Areas.DB, 86, 0, 2)
-        set_bool(data, byte_index=1, bool_index=6, value=False)
-        set_bool(data, byte_index=1, bool_index=7, value=False)
-        plc_client.write_area(Areas.DB, 86, 0, data)
-        plc_client.disconnect()
-        
-        self.preview_active = False
-        
-        # Signal threads to stop
-        if self.preview_stop_flag:
-            self.preview_stop_flag.set()
-        
-        # Unblock navigation buttons
-        self._unblock_navigation_buttons()
-        
-        # Unblock logout button
-        self._unblock_logout_button()
-        
-        # Unblock model dropdowns and Save Settings button
-        self._unblock_model_dropdowns()
-        self._unblock_save_button()
-        
-        # Restore app closing
-        if hasattr(self.app, 'on_closing'):
-            self.app.protocol("WM_DELETE_WINDOW", self.app.on_closing)
-        
-        # Display black screens on both feeds
-        self._display_black_screens()
+            
+            # Check if thresholds were changed
+            if self._thresholds_changed():
+                log_info("settings", "Thresholds were modified - prompting user to save changes")
+                # Ask user: Save or Don't Save
+                response = messagebox.askyesnocancel(
+                    "Save Threshold Changes?",
+                    "Threshold values have been modified.\n\n"
+                    "Do you want to save these changes to the database?\n\n"
+                    "Yes: Save changes\n"
+                    "No: Discard changes (restore previous values)\n"
+                    "Cancel: Continue preview"
+                )
+                
+                if response is None:  # Cancel - continue preview
+                    log_info("settings", "User cancelled stop preview - continuing preview")
+                    return
+                elif response:  # Yes - save changes
+                    log_info("settings", "User chose to save threshold changes")
+                    self.save_settings()
+                else:  # No - restore previous values
+                    log_info("settings", "User chose to discard threshold changes")
+                    self._restore_threshold_snapshot()
+            
+            # Turn off PLC lights
+            log_info("settings", "Turning off PLC lights")
+            plc_client = snap7.client.Client()
+            plc_client.connect("172.17.8.17", 0, 1)        
+            data = plc_client.read_area(Areas.DB, 86, 0, 2)
+            set_bool(data, byte_index=1, bool_index=6, value=False)
+            set_bool(data, byte_index=1, bool_index=7, value=False)
+            plc_client.write_area(Areas.DB, 86, 0, data)
+            plc_client.disconnect()
+            
+            self.preview_active = False
+            
+            # Signal threads to stop
+            if self.preview_stop_flag:
+                self.preview_stop_flag.set()
+            
+            # Unblock navigation buttons
+            self._unblock_navigation_buttons()
+            
+            # Unblock logout button
+            self._unblock_logout_button()
+            
+            # Unblock model dropdowns and Save Settings button
+            self._unblock_model_dropdowns()
+            self._unblock_save_button()
+            
+            # Restore app closing
+            if hasattr(self.app, 'on_closing'):
+                self.app.protocol("WM_DELETE_WINDOW", self.app.on_closing)
+            
+            # Display black screens on both feeds
+            self._display_black_screens()
 
-        # Wait for threads to finish properly
-        if hasattr(self, 'preview_od_thread') and self.preview_od_thread and self.preview_od_thread.is_alive():
-            self.preview_od_thread.join(timeout=2.0)
-        
-        if hasattr(self, 'preview_bf_thread') and self.preview_bf_thread and self.preview_bf_thread.is_alive():
-            self.preview_bf_thread.join(timeout=2.0)
-        
-        # Unload models to free memory
-        if self.preview_bf_model is not None:
-            del self.preview_bf_model
-            self.preview_bf_model = None
-        
-        if self.preview_od_model is not None:
-            del self.preview_od_model
-            self.preview_od_model = None
-        
-        # Stop camera capture processes using process manager
-        if self.preview_bf_camera_process is not None:
-            self.app.process_manager.register_preview_process(self.preview_bf_camera_process)
-        
-        if self.preview_od_camera_process is not None:
-            self.app.process_manager.register_preview_process(self.preview_od_camera_process)
-        
-        self.app.process_manager.stop_all_preview()
+            # Wait for threads to finish properly
+            if hasattr(self, 'preview_od_thread') and self.preview_od_thread and self.preview_od_thread.is_alive():
+                self.preview_od_thread.join(timeout=2.0)
+            
+            if hasattr(self, 'preview_bf_thread') and self.preview_bf_thread and self.preview_bf_thread.is_alive():
+                self.preview_bf_thread.join(timeout=2.0)
+            
+            # Unload models to free memory
+            if self.preview_bf_model is not None:
+                del self.preview_bf_model
+                self.preview_bf_model = None
+            
+            if self.preview_od_model is not None:
+                del self.preview_od_model
+                self.preview_od_model = None
+            
+            # Stop camera capture processes using process manager
+            if self.preview_bf_camera_process is not None:
+                self.app.process_manager.register_preview_process(self.preview_bf_camera_process)
+            
+            if self.preview_od_camera_process is not None:
+                self.app.process_manager.register_preview_process(self.preview_od_camera_process)
+            
+            self.app.process_manager.stop_all_preview()
+            
+            log_info("settings", "Camera preview stopped successfully")
+            
+        except Exception as e:
+            log_error("settings", "Error stopping camera preview", e)
+            messagebox.showerror("Error", f"Failed to stop preview:\n{str(e)}")
         
         # Clear process references
         self.preview_bf_camera_process = None

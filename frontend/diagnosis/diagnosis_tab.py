@@ -8,6 +8,7 @@ import tkinter as tk
 from frontend.utils.config import AppConfig
 from ..utils.styles import Colors, Fonts
 from ..utils.db_error_handler import DatabaseErrorHandler
+from ..utils.debug_logger import log_error, log_info
 from .report_data_table import ReportDataTable
 from .control_panel import ControlPanel
 from .action_panel import ActionPanel
@@ -41,61 +42,70 @@ class DiagnosisTab:
         
     def setup(self):
         """Setup the diagnosis tab UI."""
-        # Main container with dark blue background
-        main_container = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
-        main_container.pack(fill=tk.BOTH, expand=True)
-        
-        # Header frame for title
-        header_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
-        header_frame.pack(fill=tk.X, pady=(10, 10))
-        
-        # Title (centered)
-        title_label = tk.Label(
-            header_frame,
-            text="Date & Time-Based Report Sheet",
-            font=Fonts.TITLE,
-            fg=Colors.WHITE,
-            bg=Colors.PRIMARY_BG
-        )
-        title_label.pack()
-        
-        # Top section: Report Data Table + Controls + Actions (increased height for visibility)
-        top_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG, height=280)
-        top_frame.pack(fill=tk.X, padx=10, pady=5)
-        top_frame.pack_propagate(False)  # Prevent frame from shrinking
-        
-        # Report Data Table (left side)
-        self.report_data_table = ReportDataTable(top_frame, self)
-        self.report_data_table.create()
-        
-        # Right panel: Controls + Actions (fixed width for better control display)
-        right_panel = tk.Frame(top_frame, bg=Colors.PRIMARY_BG, width=320)
-        right_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(10, 0))
-        right_panel.pack_propagate(False)  # Maintain fixed width
-        
-        # Control Panel
-        self.control_panel = ControlPanel(right_panel, self)
-        self.control_panel.create()
-        
-        # Action Panel
-        self.action_panel = ActionPanel(right_panel, self)
-        self.action_panel.create()
-        
-        # Bottom section: Charts (side by side with more height)
-        charts_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
-        charts_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        # LAZY LOADING: Create charts only when data is loaded
-        # Show placeholder message initially
-        self.charts_placeholder = tk.Label(
-            charts_frame,
-            text="📊 Generate a report to view charts",
-            font=Fonts.SUBTITLE,
-            fg="#888888",
-            bg=Colors.PRIMARY_BG,
-            pady=50
-        )
-        self.charts_placeholder.pack(fill=tk.BOTH, expand=True)
+        try:
+            log_info("diagnosis", "Setting up Diagnosis tab")
+            
+            # Main container with dark blue background
+            main_container = tk.Frame(self.parent, bg=Colors.PRIMARY_BG)
+            main_container.pack(fill=tk.BOTH, expand=True)
+            
+            # Header frame for title
+            header_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
+            header_frame.pack(fill=tk.X, pady=(10, 10))
+            
+            # Title (centered)
+            title_label = tk.Label(
+                header_frame,
+                text="Date & Time-Based Report Sheet",
+                font=Fonts.TITLE,
+                fg=Colors.WHITE,
+                bg=Colors.PRIMARY_BG
+            )
+            title_label.pack()
+            
+            # Top section: Report Data Table + Controls + Actions (increased height for visibility)
+            top_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG, height=280)
+            top_frame.pack(fill=tk.X, padx=10, pady=5)
+            top_frame.pack_propagate(False)  # Prevent frame from shrinking
+            
+            # Report Data Table (left side)
+            self.report_data_table = ReportDataTable(top_frame, self)
+            self.report_data_table.create()
+            
+            # Right panel: Controls + Actions (fixed width for better control display)
+            right_panel = tk.Frame(top_frame, bg=Colors.PRIMARY_BG, width=320)
+            right_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(10, 0))
+            right_panel.pack_propagate(False)  # Maintain fixed width
+            
+            # Control Panel
+            self.control_panel = ControlPanel(right_panel, self)
+            self.control_panel.create()
+            
+            # Action Panel
+            self.action_panel = ActionPanel(right_panel, self)
+            self.action_panel.create()
+            
+            # Bottom section: Charts (side by side with more height)
+            charts_frame = tk.Frame(main_container, bg=Colors.PRIMARY_BG)
+            charts_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+            
+            # LAZY LOADING: Create charts only when data is loaded
+            # Show placeholder message initially
+            self.charts_placeholder = tk.Label(
+                charts_frame,
+                text="📊 Generate a report to view charts",
+                font=Fonts.SUBTITLE,
+                fg="#888888",
+                bg=Colors.PRIMARY_BG,
+                pady=50
+            )
+            self.charts_placeholder.pack(fill=tk.BOTH, expand=True)
+            
+            log_info("diagnosis", "Diagnosis tab setup completed")
+            
+        except Exception as e:
+            log_error("diagnosis", "Failed to setup Diagnosis tab", e)
+            raise
         
         # Store charts frame reference for later
         self.charts_frame = charts_frame

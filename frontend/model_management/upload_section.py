@@ -8,6 +8,7 @@ from tkinter import filedialog, messagebox
 import os
 import shutil
 from ..utils.styles import Colors, Fonts
+from ..utils.debug_logger import log_error, log_warning, log_info
 from .model_database import ModelDatabase
 
 
@@ -186,6 +187,8 @@ class UploadSection:
             source_file: Source file path
         """
         try:
+            log_info("model_management", f"Attempting to upload model - Name: {model_name}, Type: {model_type}")
+            
             # Create destination directory
             username = os.getlogin()
             dest_dir = f"C:\\Users\\{username}\\Desktop\\Models\\{model_type}"
@@ -195,6 +198,7 @@ class UploadSection:
             base_name = os.path.basename(source_file)
             dest_path = os.path.join(dest_dir, base_name)
             
+            log_info("model_management", f"Copying model file to: {dest_path}")
             # Copy file
             shutil.copy2(source_file, dest_path)
             
@@ -214,6 +218,7 @@ class UploadSection:
                 db.disconnect()
                 
                 if success:
+                    log_info("model_management", f"Model '{model_name}' uploaded successfully by user '{uploaded_by}' - Path: {dest_path}")
                     messagebox.showinfo(
                         "Success",
                         f"Model '{model_name}' uploaded successfully!\n\nSaved to: {dest_path}"
@@ -230,11 +235,14 @@ class UploadSection:
                     if hasattr(self.tab, 'app'):
                         self.tab.app.reload_models_and_notify_tabs()
                 else:
+                    log_error("model_management", f"Failed to save model '{model_name}' to database")
                     messagebox.showerror("Error", "Failed to save model to database!")
             else:
+                log_error("model_management", f"Failed to connect to database for model upload - {model_name}")
                 messagebox.showerror("Error", "Failed to connect to database!")
                 
         except Exception as e:
+            log_error("model_management", f"Error uploading model '{model_name}' (Type: {model_type})", e)
             messagebox.showerror("Error", f"Failed to upload model:\n{str(e)}")
             print(f"❌ Upload error: {e}")
             import traceback
