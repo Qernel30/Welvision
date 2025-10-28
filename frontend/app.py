@@ -92,6 +92,7 @@ class WelVisionApp(tk.Tk):
         # Inspection status
         self.inspection_running = False
         self.camera_running = False
+        self.inspection_has_run = False  # Track if inspection has been run at least once
         
         # Process manager for cleanup
         self.process_manager = ProcessManager()
@@ -1113,10 +1114,11 @@ class WelVisionApp(tk.Tk):
     
     def on_closing(self):
         """Handle application closing."""
+        from tkinter import messagebox
+        
         # Check if settings preview is active
         if hasattr(self, 'settings_tab') and self.settings_tab:
             if hasattr(self.settings_tab, 'preview_active') and self.settings_tab.preview_active:
-                from tkinter import messagebox
                 response = messagebox.askyesno(
                     "Preview Active",
                     "Settings preview is currently running.\n\n"
@@ -1125,6 +1127,15 @@ class WelVisionApp(tk.Tk):
                 )
                 if not response:
                     return  
+        
+        # Always show confirmation dialog when closing
+        response = messagebox.askyesno(
+            "Confirm Exit",
+            "Are you sure you want to close the application?"
+        )
+        
+        if not response:
+            return  # User cancelled
         
         print("Closing application...")
         # Stop camera threads

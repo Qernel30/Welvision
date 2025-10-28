@@ -75,12 +75,13 @@ class ControlPanel:
             control_frame,
             text="Reset",
             font=Fonts.TEXT_BOLD,
-            bg="#ff8c00",  # Orange
+            bg="#6c757d",  # Grey (initially disabled color)
             fg=Colors.WHITE,
             disabledforeground=Colors.WHITE,  # White text when disabled
             width=15,
             height=2,
-            command=self._reset_results
+            command=self._reset_results,
+            state=tk.DISABLED  # Initially disabled
         )
         self.reset_button.pack(side=tk.LEFT, padx=10, pady=5)
         
@@ -332,6 +333,9 @@ class ControlPanel:
         if not self._validate_system_ready():
             return  # Exit if validation fails
         
+        # Mark that inspection has been run at least once
+        self.app.inspection_has_run = True
+        
         if hasattr(self.app, 'shared_data') and self.app.shared_data is not None:
             self.app.shared_data['allow_all'] = self.allow_images_var.get()
             
@@ -389,7 +393,8 @@ class ControlPanel:
             self.start_button.config(state=tk.NORMAL, bg=Colors.SUCCESS)
         if self.stop_button:
             self.stop_button.config(state=tk.DISABLED, bg="#6c757d")
-        if self.reset_button:
+        # Enable reset button when inspection stops (not when initially disabled)
+        if self.reset_button and hasattr(self.app, 'inspection_has_run') and self.app.inspection_has_run:
             self.reset_button.config(state=tk.NORMAL, bg="#ff8c00")
         # Re-enable allow_images checkbox when inspection is not running
         if self.allow_images_checkbox:

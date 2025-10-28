@@ -120,19 +120,21 @@ class ControlPanel:
         # Get roller types from database
         roller_types = self._get_roller_types()
         
+        # Add "All" option at the beginning
+        roller_types_with_all = ["All"] + roller_types
+        
         component_type_combo = ttk.Combobox(
             right_column,
             textvariable=self.component_type_var,
-            values=roller_types,
+            values=roller_types_with_all,
             state="readonly",
             font=Fonts.SMALL,
             width=12
         )
         component_type_combo.pack(fill=tk.X, pady=(0, 8))
         
-        # Set default value
-        if roller_types:
-            self.component_type_var.set(roller_types[0])
+        # Set default value to "All"
+        self.component_type_var.set("All")
         
         # To Date (Right) - Calendar Widget
         to_date_label = tk.Label(

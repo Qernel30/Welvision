@@ -28,7 +28,6 @@ class DebugLogger:
         username = os.getlogin()
         self._log_dir = Path(f"C:\\Users\\{username}\\Desktop\\Debug Logs")
         self._log_dir.mkdir(parents=True, exist_ok=True)
-        print(f"✅ Debug Logger initialized: {self._log_dir}")
     
     def enable_page(self, page_name):
         """Enable debug logging for a specific page."""

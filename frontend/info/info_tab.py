@@ -203,8 +203,11 @@ class InfoTab:
     
     def _load_database_config(self):
         """Load database config component."""
-        self.database_config = DatabaseConfig(self.scrollable_frame, self.app)
-        self.database_config.create()
+        # Only show database config for Super Admin
+        user_role = getattr(self.app, 'current_role', 'Operator')
+        if user_role == 'Super Admin':
+            self.database_config = DatabaseConfig(self.scrollable_frame, self.app)
+            self.database_config.create()
         
         self.parent.after(10, self._load_user_manual)
     

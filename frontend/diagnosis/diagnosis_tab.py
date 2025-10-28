@@ -383,39 +383,74 @@ class DiagnosisTab:
             
             deleted_count = 0
             
+            # Determine if we need to filter by component type or delete all
+            use_component_filter = (component_type != "All")
+            
             if report_type == 'BF':
                 # Delete from BF table only
-                delete_query = """
-                    DELETE FROM bf_roller_tracking
-                    WHERE roller_type = %s AND report_date BETWEEN %s AND %s
-                """
-                cursor.execute(delete_query, (component_type, from_date, to_date))
+                if use_component_filter:
+                    delete_query = """
+                        DELETE FROM bf_roller_tracking
+                        WHERE roller_type = %s AND report_date BETWEEN %s AND %s
+                    """
+                    cursor.execute(delete_query, (component_type, from_date, to_date))
+                else:
+                    # Delete all roller types
+                    delete_query = """
+                        DELETE FROM bf_roller_tracking
+                        WHERE report_date BETWEEN %s AND %s
+                    """
+                    cursor.execute(delete_query, (from_date, to_date))
                 deleted_count = cursor.rowcount
                 
             elif report_type == 'OD':
                 # Delete from OD table only
-                delete_query = """
-                    DELETE FROM od_roller_tracking
-                    WHERE roller_type = %s AND report_date BETWEEN %s AND %s
-                """
-                cursor.execute(delete_query, (component_type, from_date, to_date))
+                if use_component_filter:
+                    delete_query = """
+                        DELETE FROM od_roller_tracking
+                        WHERE roller_type = %s AND report_date BETWEEN %s AND %s
+                    """
+                    cursor.execute(delete_query, (component_type, from_date, to_date))
+                else:
+                    # Delete all roller types
+                    delete_query = """
+                        DELETE FROM od_roller_tracking
+                        WHERE report_date BETWEEN %s AND %s
+                    """
+                    cursor.execute(delete_query, (from_date, to_date))
                 deleted_count = cursor.rowcount
                 
             else:  # Overall - delete from both tables
                 # Delete from BF table
-                bf_delete_query = """
-                    DELETE FROM bf_roller_tracking
-                    WHERE roller_type = %s AND report_date BETWEEN %s AND %s
-                """
-                cursor.execute(bf_delete_query, (component_type, from_date, to_date))
+                if use_component_filter:
+                    bf_delete_query = """
+                        DELETE FROM bf_roller_tracking
+                        WHERE roller_type = %s AND report_date BETWEEN %s AND %s
+                    """
+                    cursor.execute(bf_delete_query, (component_type, from_date, to_date))
+                else:
+                    # Delete all roller types
+                    bf_delete_query = """
+                        DELETE FROM bf_roller_tracking
+                        WHERE report_date BETWEEN %s AND %s
+                    """
+                    cursor.execute(bf_delete_query, (from_date, to_date))
                 bf_count = cursor.rowcount
                 
                 # Delete from OD table
-                od_delete_query = """
-                    DELETE FROM od_roller_tracking
-                    WHERE roller_type = %s AND report_date BETWEEN %s AND %s
-                """
-                cursor.execute(od_delete_query, (component_type, from_date, to_date))
+                if use_component_filter:
+                    od_delete_query = """
+                        DELETE FROM od_roller_tracking
+                        WHERE roller_type = %s AND report_date BETWEEN %s AND %s
+                    """
+                    cursor.execute(od_delete_query, (component_type, from_date, to_date))
+                else:
+                    # Delete all roller types
+                    od_delete_query = """
+                        DELETE FROM od_roller_tracking
+                        WHERE report_date BETWEEN %s AND %s
+                    """
+                    cursor.execute(od_delete_query, (from_date, to_date))
                 od_count = cursor.rowcount
                 
                 deleted_count = bf_count + od_count
@@ -471,25 +506,42 @@ class DiagnosisTab:
             cursor = connection.cursor()
             
             report_type = filters['report_type']
-            component_type = filters['component_type']  # "Small"
+            component_type = filters['component_type']  
             from_date = filters['from_date']
             to_date = filters['to_date']
             
             all_data = []
             
+            # Determine if we need to filter by component type or get all
+            use_component_filter = (component_type != "All")
+            
             if report_type == 'BF':
                 # Query BF table only
-                query = """
-                    SELECT 
-                        roller_type, employee_id, report_date, start_time, end_time,
-                        total_inspected, total_accepted, total_rejected,
-                        total_rust, total_dent, total_damage, 
-                        total_high_head, total_low_head, others
-                    FROM bf_roller_tracking
-                    WHERE roller_type = %s AND report_date BETWEEN %s AND %s
-                    ORDER BY report_date DESC, start_time DESC
-                """
-                cursor.execute(query, (component_type, from_date, to_date))
+                if use_component_filter:
+                    query = """
+                        SELECT 
+                            roller_type, employee_id, report_date, start_time, end_time,
+                            total_inspected, total_accepted, total_rejected,
+                            total_rust, total_dent, total_damage, 
+                            total_high_head, total_low_head, others
+                        FROM bf_roller_tracking
+                        WHERE roller_type = %s AND report_date BETWEEN %s AND %s
+                        ORDER BY report_date DESC, start_time DESC
+                    """
+                    cursor.execute(query, (component_type, from_date, to_date))
+                else:
+                    # Get all roller types
+                    query = """
+                        SELECT 
+                            roller_type, employee_id, report_date, start_time, end_time,
+                            total_inspected, total_accepted, total_rejected,
+                            total_rust, total_dent, total_damage, 
+                            total_high_head, total_low_head, others
+                        FROM bf_roller_tracking
+                        WHERE report_date BETWEEN %s AND %s
+                        ORDER BY report_date DESC, start_time DESC
+                    """
+                    cursor.execute(query, (from_date, to_date))
                 
                 for row in cursor.fetchall():
                     comp_type, emp_id, rep_date, start, end, inspected, accepted, rejected, \
@@ -517,17 +569,31 @@ class DiagnosisTab:
             
             elif report_type == 'OD':
                 # Query OD table only
-                query = """
-                    SELECT 
-                        roller_type, employee_id, report_date, start_time, end_time,
-                        total_inspected, total_accepted, total_rejected,
-                        total_rust, total_dent, total_damage,
-                        total_damage_on_end, total_spherical, others
-                    FROM od_roller_tracking
-                    WHERE roller_type = %s AND report_date BETWEEN %s AND %s
-                    ORDER BY report_date DESC, start_time DESC
-                """
-                cursor.execute(query, (component_type, from_date, to_date))
+                if use_component_filter:
+                    query = """
+                        SELECT 
+                            roller_type, employee_id, report_date, start_time, end_time,
+                            total_inspected, total_accepted, total_rejected,
+                            total_rust, total_dent, total_damage,
+                            total_damage_on_end, total_spherical, others
+                        FROM od_roller_tracking
+                        WHERE roller_type = %s AND report_date BETWEEN %s AND %s
+                        ORDER BY report_date DESC, start_time DESC
+                    """
+                    cursor.execute(query, (component_type, from_date, to_date))
+                else:
+                    # Get all roller types
+                    query = """
+                        SELECT 
+                            roller_type, employee_id, report_date, start_time, end_time,
+                            total_inspected, total_accepted, total_rejected,
+                            total_rust, total_dent, total_damage,
+                            total_damage_on_end, total_spherical, others
+                        FROM od_roller_tracking
+                        WHERE report_date BETWEEN %s AND %s
+                        ORDER BY report_date DESC, start_time DESC
+                    """
+                    cursor.execute(query, (from_date, to_date))
                 
                 for row in cursor.fetchall():
                     comp_type, emp_id, rep_date, start, end, inspected, accepted, rejected, \
@@ -555,26 +621,50 @@ class DiagnosisTab:
             
             else:  # Overall
                 # Query both tables and combine
-                bf_query = """
-                    SELECT 
-                        roller_type, employee_id, report_date, start_time, end_time,
-                        total_inspected, total_accepted, total_rejected
-                    FROM bf_roller_tracking
-                    WHERE roller_type = %s AND report_date BETWEEN %s AND %s
-                    ORDER BY report_date DESC, start_time DESC
-                """
-                cursor.execute(bf_query, (component_type, from_date, to_date))
+                if use_component_filter:
+                    bf_query = """
+                        SELECT 
+                            roller_type, employee_id, report_date, start_time, end_time,
+                            total_inspected, total_accepted, total_rejected
+                        FROM bf_roller_tracking
+                        WHERE roller_type = %s AND report_date BETWEEN %s AND %s
+                        ORDER BY report_date DESC, start_time DESC
+                    """
+                    cursor.execute(bf_query, (component_type, from_date, to_date))
+                else:
+                    # Get all roller types
+                    bf_query = """
+                        SELECT 
+                            roller_type, employee_id, report_date, start_time, end_time,
+                            total_inspected, total_accepted, total_rejected
+                        FROM bf_roller_tracking
+                        WHERE report_date BETWEEN %s AND %s
+                        ORDER BY report_date DESC, start_time DESC
+                    """
+                    cursor.execute(bf_query, (from_date, to_date))
                 bf_rows = cursor.fetchall()
                 
-                od_query = """
-                    SELECT 
-                        roller_type, employee_id, report_date, start_time, end_time,
-                        total_inspected, total_accepted, total_rejected
-                    FROM od_roller_tracking
-                    WHERE roller_type = %s AND report_date BETWEEN %s AND %s
-                    ORDER BY report_date DESC, start_time DESC
-                """
-                cursor.execute(od_query, (component_type, from_date, to_date))
+                if use_component_filter:
+                    od_query = """
+                        SELECT 
+                            roller_type, employee_id, report_date, start_time, end_time,
+                            total_inspected, total_accepted, total_rejected
+                        FROM od_roller_tracking
+                        WHERE roller_type = %s AND report_date BETWEEN %s AND %s
+                        ORDER BY report_date DESC, start_time DESC
+                    """
+                    cursor.execute(od_query, (component_type, from_date, to_date))
+                else:
+                    # Get all roller types
+                    od_query = """
+                        SELECT 
+                            roller_type, employee_id, report_date, start_time, end_time,
+                            total_inspected, total_accepted, total_rejected
+                        FROM od_roller_tracking
+                        WHERE report_date BETWEEN %s AND %s
+                        ORDER BY report_date DESC, start_time DESC
+                    """
+                    cursor.execute(od_query, (from_date, to_date))
                 od_rows = cursor.fetchall()
                 
                 # Create a dictionary to group by date and employee
