@@ -38,8 +38,11 @@ def create_header(parent, title, user_email, user_role, logout_callback, app_ins
     Returns:
         Tuple of (header_frame, logout_button, debug_checkbutton)
     """
-    header_frame = tk.Frame(parent, bg=Colors.PRIMARY_BG, height=50)
+    # Fixed height header frame to ensure consistency across all roles
+    # Increased height to accommodate Logout button + Debug + Allow All Images checkboxes
+    header_frame = tk.Frame(parent, bg=Colors.PRIMARY_BG, height=85)
     header_frame.pack(fill=tk.X)
+    header_frame.pack_propagate(False)  # Prevent frame from shrinking/expanding
     
     # Logo in header
     logo_label = tk.Label(
@@ -79,7 +82,7 @@ def create_header(parent, title, user_email, user_role, logout_callback, app_ins
         relief=tk.RAISED,
         bd=2,
         padx=15,
-        pady=5,
+        pady=3,  # Reduced padding to save vertical space
         cursor="hand2",
         command=logout_callback
     )
@@ -158,9 +161,49 @@ def create_header(parent, title, user_email, user_role, logout_callback, app_ins
         activebackground=Colors.PRIMARY_BG,
         activeforeground=Colors.WHITE,
         cursor="hand2",
-        command=on_debug_toggle
+        command=on_debug_toggle,
+        anchor="w",  # Left align text for consistent width
+        wraplength=150  # Wrap text if needed
     )
-    debug_checkbutton.pack(pady=(2, 0))
+    debug_checkbutton.pack(pady=(1, 0), fill=tk.X)  # Reduced padding
+    
+    # Allow All Images checkbutton (below Debug, only for Super Admin)
+    allow_images_checkbutton = None
+    if app_instance:
+        from .permissions import Permissions
+        user_role = getattr(app_instance, 'current_role', 'Operator')
+        can_access = Permissions.can_access_allow_all_images(user_role)
+        
+        if can_access:
+            allow_images_var = tk.BooleanVar(value=False)
+            
+            def on_allow_images_toggle():
+                """Handle allow images checkbox toggle."""
+                if hasattr(app_instance, 'shared_data') and app_instance.shared_data is not None:
+                    app_instance.shared_data['allow_all'] = allow_images_var.get()
+                    status = "enabled" if allow_images_var.get() else "disabled"
+                    print(f"Allow all images: {status}")
+            
+            allow_images_checkbutton = tk.Checkbutton(
+                button_container,
+                text="Allow all images",
+                variable=allow_images_var,
+                font=Fonts.SMALL_BOLD,
+                bg=Colors.PRIMARY_BG,
+                fg=Colors.WHITE,
+                selectcolor=Colors.SECONDARY_BG,
+                activebackground=Colors.PRIMARY_BG,
+                activeforeground=Colors.WHITE,
+                cursor="hand2",
+                command=on_allow_images_toggle,
+                anchor="w",  # Left align text for consistent width
+                wraplength=150  # Wrap text if needed to prevent cutoff
+            )
+            allow_images_checkbutton.pack(pady=(1, 0), fill=tk.X)  # Reduced padding
+            
+            # Store in app instance
+            app_instance.allow_images_var = allow_images_var
+            app_instance.allow_images_checkbutton = allow_images_checkbutton
     
     # Store debug var in app instance for page-specific toggling
     if app_instance:

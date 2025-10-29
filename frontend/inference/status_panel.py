@@ -65,7 +65,7 @@ class StatusPanel:
     
     def _create_roller_type_section(self, parent, column):
         """Create roller type section with dropdown."""
-        frame = self._create_section_frame(parent, "Roller Data", column)
+        frame = self._create_section_frame(parent, "Roller Type", column)
         
         # Get roller types from database
         roller_types = self._get_roller_types()
@@ -90,6 +90,10 @@ class StatusPanel:
         if roller_types:
             self.roller_dropdown.set(roller_types[0])
             self._load_roller_info(roller_types[0])
+        
+        # Block dropdown if inspection is already running
+        if hasattr(self.app, 'inspection_running') and self.app.inspection_running:
+            self.roller_dropdown.config(state="disabled")
     
     def _get_roller_types(self):
         """Get list of roller types from database."""
@@ -397,3 +401,13 @@ class StatusPanel:
         except tk.TclError as e:
             # Widget was destroyed, ignore the error
             print(f"⚠️ Could not update model names: Widget no longer exists")
+    
+    def lock_roller_selection(self):
+        """Lock the roller type dropdown during inspection."""
+        if hasattr(self, 'roller_dropdown') and self.roller_dropdown:
+            self.roller_dropdown.config(state="disabled")
+    
+    def unlock_roller_selection(self):
+        """Unlock the roller type dropdown after inspection stops."""
+        if hasattr(self, 'roller_dropdown') and self.roller_dropdown:
+            self.roller_dropdown.config(state="readonly")

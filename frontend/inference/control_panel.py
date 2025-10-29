@@ -7,7 +7,6 @@ import tkinter as tk
 from tkinter import messagebox
 from ..utils.styles import Colors, Fonts
 from ..utils.config import AppConfig
-from ..utils.permissions import Permissions
 from database import save_to_database
 from .state_manager import InspectionStateManager
 import snap7
@@ -30,7 +29,6 @@ class ControlPanel:
         self.start_button = None
         self.stop_button = None
         self.reset_button = None
-        self.allow_images_var = None
         
         # State manager for UI state changes
         self.state_manager = InspectionStateManager(app_instance)
@@ -85,31 +83,6 @@ class ControlPanel:
         )
         self.reset_button.pack(side=tk.LEFT, padx=10, pady=5)
         
-        # Allow all images checkbox - Only visible for Super Admin
-        self.allow_images_var = tk.BooleanVar(value=False)
-        
-        # Check if user has permission to access this feature
-        user_role = getattr(self.app, 'current_role', 'Operator')
-        can_access = Permissions.can_access_allow_all_images(user_role)
-        
-        if can_access:
-            self.allow_images_checkbox = tk.Checkbutton(
-                control_frame,
-                text="Allow all images",
-                font=Fonts.TEXT,
-                fg=Colors.WHITE,
-                bg=Colors.PRIMARY_BG,
-                selectcolor=Colors.PRIMARY_BG,
-                activebackground=Colors.PRIMARY_BG,
-                activeforeground=Colors.WHITE,
-                variable=self.allow_images_var,
-                command=self._toggle_allow_images
-            )
-            self.allow_images_checkbox.pack(side=tk.LEFT, padx=30, pady=5)
-        else:
-            # Don't show checkbox for non-Super Admin users
-            self.allow_images_checkbox = None
-        
         # Apply inspection state if inspection is running
         self._restore_inspection_state()
         
@@ -117,6 +90,17 @@ class ControlPanel:
     
     def _reset_results(self):
         """Reset all inspection results and save to database."""
+        # Show confirmation dialog first
+        confirm_reset = messagebox.askyesno(
+            "Reset Counters",
+            "Are you sure you want to reset all inspection counters?\n\n"
+            "This will clear all current statistics."
+        )
+        
+        if not confirm_reset:
+            return  # User cancelled - keep Reset button enabled
+        
+        # User confirmed - proceed with reset and then disable the button
         
         # Check if there's data to save
         if hasattr(self.app, 'shared_data') and self.app.shared_data:
@@ -195,15 +179,9 @@ class ControlPanel:
         self.app.bf_defective = 0
         self.app.bf_good = 0
         
-    
-    def _toggle_allow_images(self):
-        """Toggle allow all images setting."""
-        status = "enabled" if self.allow_images_var.get() else "disabled"
-        print(f"Allow all images: {status}")
-        
-        if hasattr(self.app, 'shared_data') and self.app.shared_data is not None:
-            self.app.shared_data['allow_all'] = self.allow_images_var.get()
-            print(f"✅ Updated shared_data['allow_all'] = {self.allow_images_var.get()}")
+        # Disable reset button after successful reset
+        if self.reset_button:
+            self.reset_button.config(state=tk.DISABLED, bg="#6c757d")
     
     def _restore_inspection_state(self):
         """Restore button states if inspection is running."""
@@ -329,6 +307,15 @@ class ControlPanel:
     
     def _on_start_inspection(self):
         """Handle start button click and monitor system readiness."""
+        # Show confirmation dialog
+        response = messagebox.askyesno(
+            "Start Inspection",
+            "Are you sure you want to start the inspection process?\n"
+        )
+        
+        if not response:
+            return  # User cancelled
+        
         # Validate system prerequisites before starting
         if not self._validate_system_ready():
             return  # Exit if validation fails
@@ -337,7 +324,11 @@ class ControlPanel:
         self.app.inspection_has_run = True
         
         if hasattr(self.app, 'shared_data') and self.app.shared_data is not None:
-            self.app.shared_data['allow_all'] = self.allow_images_var.get()
+            # Get allow_all value from header checkbox if it exists
+            if hasattr(self.app, 'allow_images_var'):
+                self.app.shared_data['allow_all'] = self.app.allow_images_var.get()
+            else:
+                self.app.shared_data['allow_all'] = False
             
             # Store selected roller type in shared_data
             if hasattr(self.app, 'inference_tab') and self.app.inference_tab:
@@ -350,8 +341,20 @@ class ControlPanel:
                         else:
                             self.app.shared_data['selected_roller_type'] = None
         
-        if self.allow_images_checkbox:
-            self.allow_images_checkbox.config(state=tk.DISABLED)
+        # Disable allow_images checkbox in header during inspection
+        if (hasattr(self.app, 'allow_images_checkbutton') and 
+            self.app.allow_images_checkbutton and 
+            self.app.allow_images_checkbutton.winfo_exists()):
+            self.app.allow_images_checkbutton.config(state=tk.DISABLED, fg="#808080")  # Grey when disabled
+        
+        # Disable debug checkbox in header during inspection (change color)
+        if (hasattr(self.app, 'debug_checkbutton') and 
+            self.app.debug_checkbutton and 
+            self.app.debug_checkbutton.winfo_exists()):
+            # Store original color before changing
+            if not hasattr(self.app, '_debug_original_fg'):
+                self.app._debug_original_fg = self.app.debug_checkbutton.cget('fg')
+            self.app.debug_checkbutton.config(state=tk.DISABLED, fg="#808080")  # Grey when disabled
         
         self.state_manager.on_inspection_start(self)
         
@@ -377,15 +380,48 @@ class ControlPanel:
     
     def _on_stop_inspection(self):
         """Handle stop button click and re-enable all buttons."""
-        # Stop the inspection process
+        # Show confirmation dialog
+        response = messagebox.askyesno(
+            "Stop Inspection",
+            "Are you sure you want to stop the inspection process?\n"
+        )
+        
+        if not response:
+            return  # User cancelled - inspection continues, Reset stays disabled
+        
+        # User confirmed - stop the inspection process
         self.app.stop_inspection()
         
-        # Re-enable the allow_images checkbox after inspection stops
-        if self.allow_images_checkbox:
-            self.allow_images_checkbox.config(state=tk.NORMAL)
+        # Re-enable the allow_images checkbox in header after inspection stops
+        if (hasattr(self.app, 'allow_images_checkbutton') and 
+            self.app.allow_images_checkbutton and 
+            self.app.allow_images_checkbutton.winfo_exists()):
+            self.app.allow_images_checkbutton.config(state=tk.NORMAL, fg=Colors.WHITE)  # White when enabled
+        
+        # Re-enable debug checkbox in header after inspection stops (restore color)
+        if (hasattr(self.app, 'debug_checkbutton') and 
+            self.app.debug_checkbutton and 
+            self.app.debug_checkbutton.winfo_exists()):
+            # Restore original color or white
+            original_fg = getattr(self.app, '_debug_original_fg', Colors.WHITE)
+            self.app.debug_checkbutton.config(state=tk.NORMAL, fg=original_fg)
         
         # Apply all UI state changes for inspection stop
         self.state_manager.on_inspection_stop(self)
+        
+        # Enable Reset button ONLY if there's data to reset (after stop is confirmed)
+        if hasattr(self.app, 'shared_data') and self.app.shared_data:
+            bf_inspected = self.app.shared_data.get("bf_inspected", 0)
+            od_inspected = self.app.shared_data.get("od_inspected", 0)
+            
+            if bf_inspected > 0 or od_inspected > 0:
+                # There's data - enable Reset button with orange color
+                if self.reset_button:
+                    self.reset_button.config(state=tk.NORMAL, bg="#ff8c00")
+            else:
+                # No data - keep Reset button disabled
+                if self.reset_button:
+                    self.reset_button.config(state=tk.DISABLED, bg="#6c757d")
     
     def enable_start(self):
         """Enable the start button and disable stop button."""
@@ -393,19 +429,44 @@ class ControlPanel:
             self.start_button.config(state=tk.NORMAL, bg=Colors.SUCCESS)
         if self.stop_button:
             self.stop_button.config(state=tk.DISABLED, bg="#6c757d")
-        # Enable reset button when inspection stops (not when initially disabled)
-        if self.reset_button and hasattr(self.app, 'inspection_has_run') and self.app.inspection_has_run:
-            self.reset_button.config(state=tk.NORMAL, bg="#ff8c00")
-        # Re-enable allow_images checkbox when inspection is not running
-        if self.allow_images_checkbox:
-            self.allow_images_checkbox.config(state=tk.NORMAL)
+        
+        # Note: Reset button state is controlled by _on_stop_inspection
+        # Don't modify it here - it should remain in its current state
+        
+        # Re-enable allow_images checkbox in header when inspection is not running
+        if (hasattr(self.app, 'allow_images_checkbutton') and 
+            self.app.allow_images_checkbutton and 
+            self.app.allow_images_checkbutton.winfo_exists()):
+            self.app.allow_images_checkbutton.config(state=tk.NORMAL, fg=Colors.WHITE)  # White when enabled
+        
+        # Re-enable debug checkbox in header when inspection is not running (restore color)
+        if (hasattr(self.app, 'debug_checkbutton') and 
+            self.app.debug_checkbutton and 
+            self.app.debug_checkbutton.winfo_exists()):
+            # Restore original color or white
+            original_fg = getattr(self.app, '_debug_original_fg', Colors.WHITE)
+            self.app.debug_checkbutton.config(state=tk.NORMAL, fg=original_fg)
     
     def enable_stop(self):
-        """Enable the stop button and disable start button."""
+        """Enable the stop button and disable start and reset buttons."""
         if self.start_button:
             self.start_button.config(state=tk.DISABLED, bg="#6c757d")
         if self.stop_button:
             self.stop_button.config(state=tk.NORMAL, bg=Colors.DANGER)
-        # Keep allow_images checkbox disabled during inspection
-        if self.allow_images_checkbox:
-            self.allow_images_checkbox.config(state=tk.DISABLED)
+        # Disable Reset button during inspection
+        if self.reset_button:
+            self.reset_button.config(state=tk.DISABLED, bg="#6c757d")
+        # Keep allow_images checkbox in header disabled during inspection
+        if (hasattr(self.app, 'allow_images_checkbutton') and 
+            self.app.allow_images_checkbutton and 
+            self.app.allow_images_checkbutton.winfo_exists()):
+            self.app.allow_images_checkbutton.config(state=tk.DISABLED, fg="#808080")  # Grey when disabled
+        
+        # Keep debug checkbox in header disabled during inspection (change color)
+        if (hasattr(self.app, 'debug_checkbutton') and 
+            self.app.debug_checkbutton and 
+            self.app.debug_checkbutton.winfo_exists()):
+            # Store original color before changing
+            if not hasattr(self.app, '_debug_original_fg'):
+                self.app._debug_original_fg = self.app.debug_checkbutton.cget('fg')
+            self.app.debug_checkbutton.config(state=tk.DISABLED, fg="#808080")  # Grey when disabled

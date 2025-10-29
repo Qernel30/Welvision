@@ -30,6 +30,9 @@ class InspectionStateManager:
         # Apply control panel button states
         self._apply_control_panel_inspection_state(control_panel)
         
+        # Lock roller type selection
+        self._lock_roller_selection()
+        
         # 4. Disable Logout button with grey color and white text
         self._disable_logout_button()
         
@@ -73,7 +76,7 @@ class InspectionStateManager:
                 fg=Colors.WHITE  # White text
             )
         
-        # 3. Disable Reset button with grey color and white text
+        # 3. Disable Reset button with grey color and white text during inspection
         if control_panel.reset_button:
             control_panel.reset_button.config(
                 state=tk.DISABLED,
@@ -108,17 +111,16 @@ class InspectionStateManager:
                 fg=Colors.WHITE  # White text
             )
         
-        # 3. Enable Reset button with orange color and white text
-        if control_panel.reset_button:
-            control_panel.reset_button.config(
-                state=tk.NORMAL,
-                bg="#ff8c00",  # Orange
-                fg=Colors.WHITE  # White text
-            )
+        # 3. Reset button state will be handled by _on_stop_inspection
+        #    It will check if there's data and enable accordingly
+        #    We don't set it here to avoid race conditions
         
         # 4. Re-enable Allow All Images checkbox
         if hasattr(control_panel, 'allow_images_checkbox') and control_panel.allow_images_checkbox:
             control_panel.allow_images_checkbox.config(state=tk.NORMAL)
+        
+        # Unlock roller type selection
+        self._unlock_roller_selection()
         
         # 5. Enable Logout button with red color and white text
         self._enable_logout_button()
@@ -211,3 +213,15 @@ class InspectionStateManager:
                 # Re-bind hover events
                 nav_button.button.bind("<Enter>", nav_button._on_hover)
                 nav_button.button.bind("<Leave>", nav_button._on_leave)
+    
+    def _lock_roller_selection(self):
+        """Lock roller type dropdown during inspection."""
+        if hasattr(self.app, 'inference_tab') and self.app.inference_tab:
+            if hasattr(self.app.inference_tab, 'status_panel') and self.app.inference_tab.status_panel:
+                self.app.inference_tab.status_panel.lock_roller_selection()
+    
+    def _unlock_roller_selection(self):
+        """Unlock roller type dropdown after inspection stops."""
+        if hasattr(self.app, 'inference_tab') and self.app.inference_tab:
+            if hasattr(self.app.inference_tab, 'status_panel') and self.app.inference_tab.status_panel:
+                self.app.inference_tab.status_panel.unlock_roller_selection()
