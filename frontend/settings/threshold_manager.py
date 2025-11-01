@@ -25,10 +25,14 @@ class ThresholdManager:
         # Storage for threshold widgets
         self.bf_threshold_sliders = {}  # {defect_name: (slider, label)}
         self.od_threshold_sliders = {}  # {defect_name: (slider, label)}
+        self.bf_size_threshold_sliders = {}  # {defect_name: (slider, label)}
+        self.od_size_threshold_sliders = {}  # {defect_name: (slider, label)}
         
         # Storage for threshold values
         self.bf_threshold_values = {}  # {defect_name: value}
         self.od_threshold_values = {}  # {defect_name: value}
+        self.bf_size_threshold_values = {}  # {defect_name: value}
+        self.od_size_threshold_values = {}  # {defect_name: value}
         
         # Model confidence sliders
         self.bf_conf_slider = None
@@ -80,7 +84,7 @@ class ThresholdManager:
         
         self.bf_conf_slider = ttk.Scale(
             bf_conf_frame, 
-            from_=1, 
+            from_=0, 
             to=100, 
             orient=tk.HORIZONTAL,
             length=300, 
@@ -124,7 +128,7 @@ class ThresholdManager:
         
         self.od_conf_slider = ttk.Scale(
             od_conf_frame, 
-            from_=1, 
+            from_=0, 
             to=100, 
             orient=tk.HORIZONTAL,
             length=300, 
@@ -163,7 +167,7 @@ class ThresholdManager:
     def create_defect_thresholds_section(self, parent_frame, bf_model, od_model):
         """
         Create dynamic defect threshold sliders based on model classes.
-        Displays BF and OD thresholds side by side in 2 columns.
+        Displays BF and OD thresholds side by side in 4 columns.
         
         Args:
             parent_frame: Parent frame to attach to
@@ -173,7 +177,7 @@ class ThresholdManager:
         # Main container for defect thresholds
         defect_container = tk.LabelFrame(
             parent_frame,
-            text="Defect Thresholds",
+            text="Thresholds",
             font=Fonts.LABEL_BOLD,
             fg=Colors.WHITE,
             bg=Colors.PRIMARY_BG,
@@ -181,18 +185,20 @@ class ThresholdManager:
         )
         defect_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Create 2-column layout
+        # Create 4-column layout
         columns_frame = tk.Frame(defect_container, bg=Colors.PRIMARY_BG)
         columns_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Configure grid weights for equal column width
         columns_frame.grid_columnconfigure(0, weight=1)
         columns_frame.grid_columnconfigure(1, weight=1)
+        columns_frame.grid_columnconfigure(2, weight=1)
+        columns_frame.grid_columnconfigure(3, weight=1)
         
-        # Left column - BF Defect Thresholds
+        # Column 1 - BF Defect Confidence
         self.bf_defect_frame = tk.LabelFrame(
             columns_frame,
-            text="BF Defect Thresholds",
+            text="BF Defect Confidence",
             font=Fonts.TEXT_BOLD,
             fg=Colors.WHITE,
             bg=Colors.PRIMARY_BG,
@@ -211,10 +217,10 @@ class ThresholdManager:
                     default_value=100
                 )
         
-        # Right column - OD Defect Thresholds
+        # Column 2 - OD Defect Confidence
         self.od_defect_frame = tk.LabelFrame(
             columns_frame,
-            text="OD Defect Thresholds",
+            text="OD Defect Confidence",
             font=Fonts.TEXT_BOLD,
             fg=Colors.WHITE,
             bg=Colors.PRIMARY_BG,
@@ -232,6 +238,50 @@ class ThresholdManager:
                     'od',
                     default_value=100
                 )
+        
+        # Column 3 - BF Defect Size Threshold
+        self.bf_size_frame = tk.LabelFrame(
+            columns_frame,
+            text="BF Defect Size Threshold",
+            font=Fonts.TEXT_BOLD,
+            fg=Colors.WHITE,
+            bg=Colors.PRIMARY_BG,
+            bd=2
+        )
+        self.bf_size_frame.grid(row=0, column=2, sticky="nsew", padx=5, pady=5)
+        
+        # Get BF model classes for size thresholds
+        if bf_model and hasattr(bf_model, 'names'):
+            bf_classes = bf_model.names
+            for class_id, class_name in bf_classes.items():
+                self._create_size_threshold_slider(
+                    self.bf_size_frame,
+                    class_name,
+                    'bf',
+                    default_value=0
+                )
+        
+        # Column 4 - OD Defect Size Threshold
+        self.od_size_frame = tk.LabelFrame(
+            columns_frame,
+            text="OD Defect Size Threshold",
+            font=Fonts.TEXT_BOLD,
+            fg=Colors.WHITE,
+            bg=Colors.PRIMARY_BG,
+            bd=2
+        )
+        self.od_size_frame.grid(row=0, column=3, sticky="nsew", padx=5, pady=5)
+        
+        # Get OD model classes for size thresholds
+        if od_model and hasattr(od_model, 'names'):
+            od_classes = od_model.names
+            for class_id, class_name in od_classes.items():
+                self._create_size_threshold_slider(
+                    self.od_size_frame,
+                    class_name,
+                    'od',
+                    default_value=0
+                )
     
     def _create_threshold_slider(self, parent, defect_name, model_type, default_value=100):
         """
@@ -244,18 +294,18 @@ class ThresholdManager:
             default_value: Default threshold value (0-100)
         """
         slider_frame = tk.Frame(parent, bg=Colors.PRIMARY_BG, pady=5)
-        slider_frame.pack(fill=tk.X, padx=10)
+        slider_frame.pack(fill=tk.X, padx=5)  # Reduced outer padding
         
         label = tk.Label(
             slider_frame,
             text=f"{defect_name}:",
-            font=Fonts.TEXT,
+            font=Fonts.SMALL,  # Smaller font to fit more text
             fg=Colors.WHITE,
             bg=Colors.PRIMARY_BG,
-            width=20,
+            width=17,  # Increased to show full defect names
             anchor="w"
         )
-        label.pack(side=tk.LEFT, padx=10)
+        label.pack(side=tk.LEFT, padx=2)
         
         var = tk.DoubleVar(value=default_value)
         
@@ -264,11 +314,10 @@ class ThresholdManager:
             from_=0,
             to=100,
             orient=tk.HORIZONTAL,
-            length=300,
-            variable=var,
-            command=lambda val: update_label(val)
+            length=150,  # Reduced slider length
+            variable=var
         )
-        slider.pack(side=tk.LEFT, padx=10, fill=tk.X, expand=True)
+        slider.pack(side=tk.LEFT, padx=2)
         
         # Bind click event for direct positioning
         slider.bind("<Button-1>", lambda e: self._slider_click_handler(e, slider, var))
@@ -276,12 +325,13 @@ class ThresholdManager:
         value_label = tk.Label(
             slider_frame,
             text=f"{int(default_value)}%",
-            font=Fonts.TEXT,
-            fg=Colors.WHITE,
+            font=Fonts.SMALL_BOLD,  # Smaller bold font
+            fg=Colors.INFO,
             bg=Colors.PRIMARY_BG,
-            width=5
+            width=5,
+            anchor="e"
         )
-        value_label.pack(side=tk.LEFT, padx=10)
+        value_label.pack(side=tk.LEFT, padx=2)
         
         def update_label(val):
             value_label.config(text=f"{int(float(val))}%")
@@ -292,6 +342,9 @@ class ThresholdManager:
         
         slider.config(command=update_label)
         
+        # Trigger initial update to display the value
+        update_label(default_value)
+        
         # Store references
         if model_type == 'bf':
             self.bf_threshold_sliders[defect_name] = (slider, value_label, var)
@@ -299,6 +352,76 @@ class ThresholdManager:
         else:
             self.od_threshold_sliders[defect_name] = (slider, value_label, var)
             self.od_threshold_values[defect_name] = default_value
+    
+    def _create_size_threshold_slider(self, parent, defect_name, model_type, default_value=0):
+        """
+        Create a single size threshold slider (measured in bounding box area in pixels).
+        
+        Args:
+            parent: Parent frame
+            defect_name: Name of the defect
+            model_type: 'bf' or 'od'
+            default_value: Default threshold value 
+        """
+        slider_frame = tk.Frame(parent, bg=Colors.PRIMARY_BG, pady=5)
+        slider_frame.pack(fill=tk.X, padx=5)  # Reduced outer padding
+        
+        label = tk.Label(
+            slider_frame,
+            text=f"{defect_name}:",
+            font=Fonts.SMALL,  # Smaller font to fit more text
+            fg=Colors.WHITE,
+            bg=Colors.PRIMARY_BG,
+            width=17,  # Increased to show full defect names
+            anchor="w"
+        )
+        label.pack(side=tk.LEFT, padx=2)
+        
+        var = tk.DoubleVar(value=default_value)
+        
+        slider = ttk.Scale(
+            slider_frame,
+            from_=1,
+            to=300000,  # Maximum area in pixels
+            orient=tk.HORIZONTAL,
+            length=120,  # Further reduced for value label space
+            variable=var
+        )
+        slider.pack(side=tk.LEFT, padx=2)
+        
+        # Bind click event for direct positioning
+        slider.bind("<Button-1>", lambda e: self._slider_click_handler(e, slider, var))
+        
+        value_label = tk.Label(
+            slider_frame,
+            text=f"{int(default_value)} px²",
+            font=Fonts.SMALL_BOLD,  # Smaller bold font
+            fg=Colors.INFO,
+            bg=Colors.PRIMARY_BG,
+            width=13,  # Wide enough for "250000 px²"
+            anchor="e"
+        )
+        value_label.pack(side=tk.LEFT, padx=2)
+        
+        def update_label(val):
+            value_label.config(text=f"{int(float(val))} px²")
+            if model_type == 'bf':
+                self.bf_size_threshold_values[defect_name] = int(float(val))
+            else:
+                self.od_size_threshold_values[defect_name] = int(float(val))
+        
+        slider.config(command=update_label)
+        
+        # Trigger initial update to display the value
+        update_label(default_value)
+        
+        # Store references
+        if model_type == 'bf':
+            self.bf_size_threshold_sliders[defect_name] = (slider, value_label, var)
+            self.bf_size_threshold_values[defect_name] = default_value
+        else:
+            self.od_size_threshold_sliders[defect_name] = (slider, value_label, var)
+            self.od_size_threshold_values[defect_name] = default_value
     
     def get_bf_thresholds(self):
         """Get current BF defect threshold values."""
@@ -308,6 +431,14 @@ class ThresholdManager:
         """Get current OD defect threshold values."""
         return self.od_threshold_values.copy()
     
+    def get_bf_size_thresholds(self):
+        """Get current BF defect size threshold values."""
+        return self.bf_size_threshold_values.copy()
+    
+    def get_od_size_thresholds(self):
+        """Get current OD defect size threshold values."""
+        return self.od_size_threshold_values.copy()
+    
     def get_bf_model_confidence(self):
         """Get current BF model confidence from slider value."""
         return self.app.bf_conf_slider_value.get() / 100
@@ -316,7 +447,7 @@ class ThresholdManager:
         """Get current OD model confidence from slider value."""
         return self.app.od_conf_slider_value.get() / 100
     
-    def restore_thresholds(self, bf_thresholds, od_thresholds, bf_conf, od_conf):
+    def restore_thresholds(self, bf_thresholds, od_thresholds, bf_conf, od_conf, bf_size_thresholds=None, od_size_thresholds=None):
         """
         Restore threshold values.
         
@@ -325,6 +456,8 @@ class ThresholdManager:
             od_thresholds: Dictionary of OD defect thresholds
             bf_conf: BF model confidence
             od_conf: OD model confidence
+            bf_size_thresholds: Dictionary of BF size thresholds (optional)
+            od_size_thresholds: Dictionary of OD size thresholds (optional)
         """
         # Restore BF defect thresholds
         for defect_name, value in bf_thresholds.items():
@@ -341,6 +474,24 @@ class ThresholdManager:
                 var.set(value)
                 label.config(text=f"{int(value)}%")
                 self.od_threshold_values[defect_name] = value
+        
+        # Restore BF size thresholds
+        if bf_size_thresholds:
+            for defect_name, value in bf_size_thresholds.items():
+                if defect_name in self.bf_size_threshold_sliders:
+                    slider, label, var = self.bf_size_threshold_sliders[defect_name]
+                    var.set(value)
+                    label.config(text=f"{int(value)} px²")
+                    self.bf_size_threshold_values[defect_name] = value
+        
+        # Restore OD size thresholds
+        if od_size_thresholds:
+            for defect_name, value in od_size_thresholds.items():
+                if defect_name in self.od_size_threshold_sliders:
+                    slider, label, var = self.od_size_threshold_sliders[defect_name]
+                    var.set(value)
+                    label.config(text=f"{int(value)} px²")
+                    self.od_size_threshold_values[defect_name] = value
         
         # Restore model confidence
         self.app.bf_conf_slider_value.set(bf_conf * 100)

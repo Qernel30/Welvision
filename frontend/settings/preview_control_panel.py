@@ -91,6 +91,18 @@ class PreviewControlPanel:
     
     def _on_start_preview(self):
         """Handle start preview button click."""
+        # Show confirmation dialog
+        from tkinter import messagebox
+        confirm = messagebox.askyesno(
+            "Confirm Start Preview",
+            "Are you sure you want to start the camera preview?\n\n"
+            "This will load models and start camera feeds for testing thresholds.",
+            icon='question'
+        )
+        
+        if not confirm:
+            return
+        
         # Delegate to settings tab
         success = self.settings_tab.start_preview()
         
@@ -100,6 +112,18 @@ class PreviewControlPanel:
     
     def _on_stop_preview(self):
         """Handle stop preview button click."""
+        # Show confirmation dialog
+        from tkinter import messagebox
+        confirm = messagebox.askyesno(
+            "Confirm Stop Preview",
+            "Are you sure you want to stop the camera preview?\n\n"
+            "This will unload models and stop camera feeds.",
+            icon='question'
+        )
+        
+        if not confirm:
+            return
+        
         # Delegate to settings tab
         self.settings_tab.stop_preview()
         

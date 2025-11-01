@@ -149,137 +149,6 @@ class InfoDatabase:
             DatabaseErrorHandler.handle_db_error(e, context="updating app title")
             return False
     
-    def get_settings_history(self, limit=100):
-        """
-        Get settings change history.
-        
-        Args:
-            limit: Maximum number of records to retrieve
-            
-        Returns:
-            list: List of history records
-        """
-        try:
-            if not self.connection or not self.connection.is_connected():
-                if not self.connect():
-                    # Connection failed
-                    return []
-            
-            # Check if connection is still None after connect attempt
-            if not self.connection:
-                return []
-            
-            cursor = self.connection.cursor()
-            
-            # Create history table if not exists
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS settings_history (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    change_type VARCHAR(100),
-                    description TEXT,
-                    changed_by VARCHAR(100),
-                    change_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Get history
-            cursor.execute("""
-                SELECT change_type, description, changed_by, change_timestamp
-                FROM settings_history
-                ORDER BY change_timestamp DESC
-                LIMIT %s
-            """, (limit,))
-            
-            results = cursor.fetchall()
-            cursor.close()
-            
-            return results
-        
-        except Exception as e:
-            print(f"❌ Error getting settings history: {e}")
-            DatabaseErrorHandler.handle_db_error(e, context="getting settings history")
-            return []
-    
-    def add_settings_history(self, change_type, description, changed_by):
-        """
-        Add entry to settings history.
-        
-        Args:
-            change_type: Type of change (e.g., "App Title", "Database Config")
-            description: Description of the change
-            changed_by: User who made the change
-            
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        try:
-            if not self.connection or not self.connection.is_connected():
-                if not self.connect():
-                    # Connection failed
-                    return False
-            
-            # Check if connection is still None after connect attempt
-            if not self.connection:
-                return False
-            
-            cursor = self.connection.cursor()
-            
-            # Create history table if not exists
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS settings_history (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    change_type VARCHAR(100),
-                    description TEXT,
-                    changed_by VARCHAR(100),
-                    change_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Insert history record
-            cursor.execute("""
-                INSERT INTO settings_history (change_type, description, changed_by)
-                VALUES (%s, %s, %s)
-            """, (change_type, description, changed_by))
-            
-            self.connection.commit()
-            cursor.close()
-            
-            return True
-        
-        except Exception as e:
-            print(f"❌ Error adding settings history: {e}")
-            DatabaseErrorHandler.handle_db_error(e, context="adding settings history")
-            return False
-    
-    def clear_settings_history(self):
-        """
-        Clear all settings history records.
-        
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        try:
-            if not self.connection or not self.connection.is_connected():
-                if not self.connect():
-                    # Connection failed
-                    return False
-            
-            # Check if connection is still None after connect attempt
-            if not self.connection:
-                return False
-            
-            cursor = self.connection.cursor()
-            cursor.execute("DELETE FROM settings_history")
-            self.connection.commit()
-            cursor.close()
-            
-            return True
-        
-        except Exception as e:
-            print(f"❌ Error clearing settings history: {e}")
-            DatabaseErrorHandler.handle_db_error(e, context="clearing settings history")
-            return False
-    
     def get_threshold_history(self, filter_type='Overall', from_date=None, to_date=None):
         """
         Get threshold history from BF and/or OD threshold tables.
@@ -310,7 +179,7 @@ class InfoDatabase:
             if filter_type in ['BF', 'Overall']:
                 query = """
                     SELECT id, 'BF' as type, model_name, employee_id, change_timestamp, 
-                           defect_threshold, model_threshold
+                           defect_threshold, size_threshold, model_threshold
                     FROM bf_threshold_history
                     WHERE DATE(change_timestamp) BETWEEN %s AND %s
                     ORDER BY change_timestamp DESC
@@ -323,7 +192,7 @@ class InfoDatabase:
             if filter_type in ['OD', 'Overall']:
                 query = """
                     SELECT id, 'OD' as type, model_name, employee_id, change_timestamp, 
-                           defect_threshold, model_threshold
+                           defect_threshold, size_threshold, model_threshold
                     FROM od_threshold_history
                     WHERE DATE(change_timestamp) BETWEEN %s AND %s
                     ORDER BY change_timestamp DESC

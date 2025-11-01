@@ -198,13 +198,6 @@ class TitleManagement:
             # Update current title label
             self.current_title_label.config(text=f'"{new_title}"')
             
-            # Add to history
-            self.db.add_settings_history(
-                "App Title",
-                f"Changed from '{current_title}' to '{new_title}'",
-                self.app.current_user
-            )
-            
             messagebox.showinfo(
                 "Success",
                 f"Application title updated to:\n\n'{new_title}'\n\n"

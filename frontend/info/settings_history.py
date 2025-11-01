@@ -286,7 +286,7 @@ class SettingsHistory:
             else:
                 # Insert history records
                 for record in history:
-                    record_id, record_type, model_name, employee_id, timestamp, defect_threshold, model_threshold = record
+                    record_id, record_type, model_name, employee_id, timestamp, defect_threshold, size_threshold, model_threshold = record
                     
                     self.tree.insert(
                         "",
@@ -309,7 +309,8 @@ class SettingsHistory:
                         'employee_id': employee_id,
                         'timestamp': timestamp.strftime("%Y-%m-%d %H:%M:%S") if timestamp else "-",
                         'model_threshold': f"{float(model_threshold)*100:.0f}%",
-                        'defect_threshold': defect_threshold
+                        'defect_threshold': defect_threshold,
+                        'size_threshold': size_threshold
                     })
         
         except Exception as e:
@@ -378,13 +379,29 @@ Changed By: {record['employee_id']}
 Timestamp: {record['timestamp']}
 Model Threshold: {record['model_threshold']}
 
-Defect Thresholds:
+Defect Confidence Thresholds:
 """
         
         # Parse defect thresholds
         defect_str = record['defect_threshold']
         defect_lines = defect_str.replace(', ', '\n  ')
         info_text += f"  {defect_lines}"
+        
+        # Parse size thresholds (measured in bounding box area)
+        info_text += "\n\nDefect Size Thresholds (Bounding Box Area):\n"
+        size_str = record.get('size_threshold', '')
+        if size_str:
+            # Replace format: "rust:1000, dent:5000" -> "rust:1000 px², dent:5000 px²"
+            size_pairs = size_str.split(', ')
+            formatted_sizes = []
+            for pair in size_pairs:
+                if ':' in pair:
+                    name, value = pair.split(':')
+                    formatted_sizes.append(f"{name}:{value} px²")
+            size_lines = '\n  '.join(formatted_sizes)
+            info_text += f"  {size_lines}"
+        else:
+            info_text += "  Not configured"
         
         # Text widget with scrollbar
         text_frame = tk.Frame(details_frame, bg=Colors.PRIMARY_BG)
@@ -483,7 +500,8 @@ Defect Thresholds:
                     'Changed By': record['employee_id'],
                     'Timestamp': record['timestamp'],
                     'Model Threshold': record['model_threshold'],
-                    'Defect Thresholds': record['defect_threshold']
+                    'Defect Confidence Thresholds': record['defect_threshold'],
+                    'Defect Size Thresholds': record.get('size_threshold', 'Not configured')
                 })
             
             # Convert to DataFrame
@@ -525,10 +543,10 @@ Defect Thresholds:
         """Clear threshold history for selected filter type (Admin and Super Admin only)."""
         # Double-check permission
         user_role = getattr(self.app, 'current_role', 'Operator')
-        if not Permissions.can_clear_settings_history(user_role):
+        if not Permissions.can_manage_users(user_role):  # Admin and Super Admin
             messagebox.showerror(
                 "Permission Denied",
-                "Only Admin and Super Admin can clear settings history."
+                "Only Admin and Super Admin can clear threshold history."
             )
             return
         

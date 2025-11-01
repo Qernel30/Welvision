@@ -43,6 +43,80 @@ def configure_gpu_for_background():
         except Exception as e:
             print(f"⚠️ GPU configuration warning: {e}")
 
+def get_size_thresholds_for_model(model_name_path, model_type='bf'):
+    """
+    Get size thresholds from database for filtering detections based on bounding box area.
+    
+    Args:
+        model_name_path: Path of the model (e.g., 'Small_BF', 'Small_OD')
+        model_type: 'bf' or 'od'
+    
+    Returns:
+        dict: Dictionary with class names as keys and size threshold (px²) as values
+              Example: {'rust': 1000, 'dent': 5000, 'damage': 3000}
+              Returns empty dict {} if no thresholds found (will use 0 as default in filter)
+    """
+    try:
+        import mysql.connector
+        
+        connection = mysql.connector.connect(
+            host=AppConfig.DB_HOST,
+            user=AppConfig.DB_USER,
+            password=AppConfig.DB_PASSWORD,
+            database=AppConfig.DB_DATABASE
+        )
+        cursor = connection.cursor()
+        
+        # Select the correct table
+        table_name = 'bf_threshold_history' if model_type == 'bf' else 'od_threshold_history'
+        
+        # Get the Model name from model path
+        query_model = f"SELECT model_name FROM {'bf_models' if model_type == 'bf' else 'od_models'} WHERE model_path = %s"
+        cursor.execute(query_model, (model_name_path,))
+        model_name_result = cursor.fetchone()
+        model_name = model_name_result[0] if model_name_result else None
+
+        if model_name:
+            # Get the latest size threshold entry for this model
+            query = f"""
+                SELECT size_threshold 
+                FROM {table_name} 
+                WHERE model_name = %s 
+                ORDER BY change_timestamp DESC 
+                LIMIT 1
+            """
+            
+            cursor.execute(query, (model_name,))
+            result = cursor.fetchone()
+            
+            cursor.close()
+            connection.close()
+            
+            if result and result[0]:
+                size_threshold_str = result[0]
+                
+                thresholds = {}
+                
+                # Parse: "rust:1000, dent:5000, damage:3000"
+                pairs = size_threshold_str.split(', ')
+                for pair in pairs:
+                    if ':' in pair:
+                        defect_name, threshold_str = pair.split(':')
+                        threshold_value = int(threshold_str.strip())  # No % sign for size
+                        thresholds[defect_name.strip()] = threshold_value
+                
+                return thresholds
+            else:
+                return {}
+        else:
+            return {}
+            
+    except Exception as e:
+        print(f"❌ Error loading size thresholds from DB: {e}")
+        import traceback
+        traceback.print_exc()
+        return {}
+    
 def get_thresholds_for_model(model_name_path, model_type='bf'):
     """
     Get thresholds from database in the format required by filter_detections.
@@ -270,7 +344,7 @@ def annotate_detections(image, detections):
     return image
 
 
-def filter_detections(detections, thresholds):
+def filter_detections(detections, confidence_thresholds, size_thresholds):
     """
     SIMPLIFIED: Filter detections using aligned thresholds
     
@@ -281,14 +355,30 @@ def filter_detections(detections, thresholds):
     filtered = []
     
     for det in detections:
-        label = det[0]  # Detection label
-        conf = det[6]   # Detection confidence
+        label = det[0]      # Detection label
+        x1, y1, x2, y2 = det[1:5]  # Bounding box coordinates
+        conf = det[6]       # Detection confidence
         
-        # Direct threshold lookup since names are already aligned
-        threshold_value = thresholds.get(label, 50)  # Default to 50% if not found
-        threshold = threshold_value / 100.0  # Convert percentage to decimal
-        if conf >= threshold:
-            filtered.append(det)
+        
+        # 1. CONFIDENCE FILTER
+        conf_threshold_value = confidence_thresholds.get(label, 50)  # Default 50%
+        conf_threshold = conf_threshold_value / 100.0
+        
+        if conf < conf_threshold:
+            continue  # Skip if confidence too low
+
+        # 2. SIZE FILTER
+        bbox_width = x2 - x1
+        bbox_height = y2 - y1
+        bbox_area = bbox_width * bbox_height
+        
+        size_threshold = size_thresholds.get(label, 0)  # Default 0 px² (no filter)
+        
+        if bbox_area < size_threshold:
+            continue  # Skip if bounding box too small
+        
+        # Passed both filters
+        filtered.append(det)
 
     return filtered
 
@@ -462,7 +552,7 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
     # Load thresholds from database
     defect_thresholds = get_thresholds_for_model(model_bigface_path, 'bf')
     model_conf_threshold = get_model_confidence_threshold(model_bigface_path, 'bf')
-    
+    size_thresholds = get_size_thresholds_for_model(model_bigface_path, 'bf')
 
     warmup_frame = r"Warmup BF.jpg"
     try:
@@ -640,7 +730,7 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
                         label = "roller" if cls == roller_class_index else class_names[cls]
                         detections.append((label, int(x1), int(y1), int(x2), int(y2), cls, float(conf)))
 
-                filtered_detections = filter_detections(detections, defect_thresholds)
+                filtered_detections = filter_detections(detections, defect_thresholds, size_thresholds)
                 detections = sorted(filtered_detections, key=lambda x: x[1])  # Sort by x-coordinate
                 annotated_frame = frame.copy()
                 annotated_frame = annotate_detections(annotated_frame, filtered_detections)
@@ -882,6 +972,7 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
     # Load thresholds from database
     defect_thresholds = get_thresholds_for_model(model_od_path, 'od')
     model_conf_threshold = get_model_confidence_threshold(model_od_path, 'od')
+    size_thresholds = get_size_thresholds_for_model(model_od_path, 'od')
 
     od_file_counter = 0
     od_all_file_counter = 0
@@ -917,7 +1008,7 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
                             
                             detections.append((label, x1, y1, x2, y2, class_id, conf))
 
-                filtered_detections = filter_detections(detections, defect_thresholds)
+                filtered_detections = filter_detections(detections, defect_thresholds, size_thresholds)
                 detections = sorted(filtered_detections, key=lambda x: x[1])  # Sort by x-coordinate
                 annotated_frame = np_frame.copy()
                 annotated_frame = annotate_detections(annotated_frame, filtered_detections)

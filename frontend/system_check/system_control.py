@@ -121,6 +121,21 @@ class SystemControl:
     
     def _start_system(self):
         """Start the system check control."""
+        # Show confirmation dialog
+        confirm = messagebox.askyesno(
+            "Confirm Start System",
+            "Are you sure you want to start the System Check?\n\n"
+            "This will:\n"
+            "• Connect to the PLC\n"
+            "• Start monitoring camera processes\n"
+            "• Enable system control operations\n\n"
+            "Continue?",
+            icon='question'
+        )
+        
+        if not confirm:
+            return
+        
         if self.system_check_tab.start_system():
             # Update button states and colors
             self.start_button.config(state=tk.DISABLED, bg="#6C757D")  # Grey when disabled

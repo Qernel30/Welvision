@@ -184,21 +184,6 @@ class Permissions:
         return role == "Super Admin"
     
     @staticmethod
-    def can_clear_settings_history(role):
-        """
-        Check if user can clear settings history.
-        Admin and Super Admin can clear history.
-        All roles can view history.
-        
-        Args:
-            role (str): User role
-            
-        Returns:
-            bool: True if user has permission, False otherwise
-        """
-        return role in ["Admin", "Super Admin"]
-    
-    @staticmethod
     def can_manage_super_admin(role):
         """
         Check if user can add/modify Super Admin users.

@@ -54,6 +54,7 @@ CREATE_TABLES = {
             employee_id VARCHAR(255) NOT NULL,
             change_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             defect_threshold LONGTEXT NOT NULL,
+            size_threshold LONGTEXT NOT NULL,
             model_threshold DECIMAL(10,4) NOT NULL,
             model_name VARCHAR(255) NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -111,6 +112,7 @@ CREATE_TABLES = {
             employee_id VARCHAR(255) NOT NULL,
             change_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             defect_threshold LONGTEXT NOT NULL,
+            size_threshold LONGTEXT NOT NULL,
             model_threshold DECIMAL(10,4) NOT NULL,
             model_name VARCHAR(255) NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -129,16 +131,6 @@ CREATE_TABLES = {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             created_by VARCHAR(100) DEFAULT 'system'
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    """,
-
-    "settings_history": """
-        CREATE TABLE IF NOT EXISTS settings_history (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            change_type VARCHAR(100),
-            description LONGTEXT,
-            changed_by VARCHAR(100),
-            change_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     """,
 

@@ -324,7 +324,7 @@ class SettingsTab:
             
             # Load latest BF thresholds for this model
             cursor.execute("""
-                SELECT defect_threshold, model_threshold 
+                SELECT defect_threshold, size_threshold, model_threshold 
                 FROM bf_threshold_history 
                 WHERE model_name = %s 
                 ORDER BY change_timestamp DESC 
@@ -333,9 +333,11 @@ class SettingsTab:
             bf_result = cursor.fetchone()
             
             if bf_result:
-                defect_str, model_conf = bf_result
+                defect_str, size_str, model_conf = bf_result
                 # Parse defect thresholds: "rust:80%, dent:60%"
                 bf_defects = self._parse_defect_string(defect_str)
+                bf_sizes = self._parse_size_string(size_str) if size_str else {}
+                
                 # Apply BF thresholds
                 for defect_name, value in bf_defects.items():
                     if defect_name in self.threshold_manager.bf_threshold_sliders:
@@ -343,6 +345,14 @@ class SettingsTab:
                         var.set(value)
                         label.config(text=f"{int(value)}%")
                         self.threshold_manager.bf_threshold_values[defect_name] = value
+                
+                # Apply BF size thresholds
+                for defect_name, value in bf_sizes.items():
+                    if defect_name in self.threshold_manager.bf_size_threshold_sliders:
+                        slider, label, var = self.threshold_manager.bf_size_threshold_sliders[defect_name]
+                        var.set(value)
+                        label.config(text=f"{int(value)} px²")
+                        self.threshold_manager.bf_size_threshold_values[defect_name] = value
                 
                 # Apply BF model confidence
                 self.app.bf_conf_threshold = float(model_conf)
@@ -352,7 +362,7 @@ class SettingsTab:
             
             # Load latest OD thresholds for this model
             cursor.execute("""
-                SELECT defect_threshold, model_threshold 
+                SELECT defect_threshold, size_threshold, model_threshold 
                 FROM od_threshold_history 
                 WHERE model_name = %s 
                 ORDER BY change_timestamp DESC 
@@ -361,9 +371,11 @@ class SettingsTab:
             od_result = cursor.fetchone()
             
             if od_result:
-                defect_str, model_conf = od_result
+                defect_str, size_str, model_conf = od_result
                 # Parse defect thresholds
                 od_defects = self._parse_defect_string(defect_str)
+                od_sizes = self._parse_size_string(size_str) if size_str else {}
+                
                 # Apply OD thresholds
                 for defect_name, value in od_defects.items():
                     if defect_name in self.threshold_manager.od_threshold_sliders:
@@ -371,6 +383,14 @@ class SettingsTab:
                         var.set(value)
                         label.config(text=f"{int(value)}%")
                         self.threshold_manager.od_threshold_values[defect_name] = value
+                
+                # Apply OD size thresholds
+                for defect_name, value in od_sizes.items():
+                    if defect_name in self.threshold_manager.od_size_threshold_sliders:
+                        slider, label, var = self.threshold_manager.od_size_threshold_sliders[defect_name]
+                        var.set(value)
+                        label.config(text=f"{int(value)} px²")
+                        self.threshold_manager.od_size_threshold_values[defect_name] = value
                 
                 # Apply OD model confidence
                 self.app.od_conf_threshold = float(model_conf)
@@ -399,8 +419,35 @@ class SettingsTab:
             print(f"⚠️ Error parsing defect string: {e}")
         return defects
     
+    def _parse_size_string(self, size_str):
+        """Parse size threshold string format: 'rust:1000, dent:5000' to dict (area in pixels)."""
+        sizes = {}
+        try:
+            pairs = size_str.split(', ')
+            for pair in pairs:
+                if ':' in pair:
+                    name, value = pair.split(':')
+                    # Convert to int (no % sign for sizes)
+                    value = int(value.strip())
+                    sizes[name.strip()] = value
+        except Exception as e:
+            print(f"⚠️ Error parsing size string: {e}")
+        return sizes
+    
     def save_settings(self):
         """Save the current settings to database and apply to inference."""
+        # Show confirmation dialog
+        confirm = messagebox.askyesno(
+            "Confirm Save Settings",
+            "Are you sure you want to save the current threshold settings?\n\n"
+            "This will update the database and apply settings to the system.",
+            icon='question'
+        )
+        
+        if not confirm:
+            log_info("settings", "User cancelled save settings")
+            return
+        
         try:
             log_info("settings", "Saving threshold settings")
             
@@ -414,6 +461,8 @@ class SettingsTab:
             # Get threshold values
             bf_thresholds = self.threshold_manager.get_bf_thresholds()
             od_thresholds = self.threshold_manager.get_od_thresholds()
+            bf_size_thresholds = self.threshold_manager.get_bf_size_thresholds()
+            od_size_thresholds = self.threshold_manager.get_od_size_thresholds()
             bf_conf = self.threshold_manager.get_bf_model_confidence()
             od_conf = self.threshold_manager.get_od_model_confidence()
             
@@ -424,14 +473,16 @@ class SettingsTab:
             # Save to database
             bf_success = self.threshold_db.save_bf_thresholds(
                 employee_id, 
-                bf_thresholds, 
+                bf_thresholds,
+                bf_size_thresholds,
                 bf_conf, 
                 bf_model_name
             )
             
             od_success = self.threshold_db.save_od_thresholds(
                 employee_id, 
-                od_thresholds, 
+                od_thresholds,
+                od_size_thresholds,
                 od_conf, 
                 od_model_name
             )
@@ -748,16 +799,17 @@ class SettingsTab:
         # Register with process manager
         self.app.process_manager.register_preview_thread(self.preview_bf_thread)
     
-    def _filter_and_draw_detections(self, frame, results, model_conf_threshold, defect_thresholds, model_type='od'):
+    def _filter_and_draw_detections(self, frame, results, model_conf_threshold, defect_thresholds, size_thresholds, model_type='od'):
         """
-        Filter detections based on thresholds and draw only those that pass.
+        Filter detections based on confidence and size thresholds, then draw annotations.
         Uses different colors for different classes and bold text for class names.
         
         Args:
             frame: Original frame
             results: YOLO prediction results
             model_conf_threshold: Model confidence threshold (0-1)
-            defect_thresholds: Dictionary of defect-specific thresholds (0-100)
+            defect_thresholds: Dictionary of defect-specific confidence thresholds (0-100)
+            size_thresholds: Dictionary of defect-specific size thresholds (area in px²)
             model_type: 'od' or 'bf' to identify which defect thresholds to use
             
         Returns:
@@ -798,15 +850,23 @@ class SettingsTab:
             cls_id = int(box.cls[0])
             class_name = class_names[cls_id]
             
-            # Get defect-specific threshold (default to 0 if not found)
+            # Get bounding box coordinates
+            x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+            
+            # Calculate bounding box area (width * height)
+            width = x2 - x1
+            height = y2 - y1
+            bbox_area = width * height
+            
+            # Get defect-specific confidence threshold (default to 0 if not found)
             defect_threshold = defect_thresholds.get(class_name, 0) / 100.0
             
-            # Apply both model confidence and defect-specific thresholds
-            if conf >= model_conf_threshold and conf >= defect_threshold:
-                # Get bounding box coordinates
-                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-                
+            # Get defect-specific size threshold (default to 0 if not found)
+            size_threshold = size_thresholds.get(class_name, 0)
+            
+            # Apply filters: Model Confidence + Defect Confidence + Size Threshold
+            if conf >= model_conf_threshold and conf >= defect_threshold and bbox_area >= size_threshold:
                 # Select color based on class ID
                 color = color_palette[cls_id % len(color_palette)]
                 
@@ -868,6 +928,7 @@ class SettingsTab:
                     # Get real-time threshold values from sliders
                     current_od_conf = self.app.od_conf_slider_value.get() / 100.0
                     current_od_defect_thresholds = self.threshold_manager.get_od_thresholds()
+                    current_od_size_thresholds = self.threshold_manager.get_od_size_thresholds()
                     
                     # Double-check model is still loaded before prediction
                     if self.preview_od_model is None:
@@ -887,11 +948,13 @@ class SettingsTab:
                     )
                     
                     # Filter and draw detections based on current slider values
+                    # Applies: Model Confidence Filter + Defect Confidence Filter + Size Threshold Filter
                     annotated_frame = self._filter_and_draw_detections(
                         frame, 
                         results, 
                         current_od_conf, 
                         current_od_defect_thresholds,
+                        current_od_size_thresholds,
                         model_type='od'
                     )
                     od_feed.update_frame(annotated_frame)
@@ -931,6 +994,7 @@ class SettingsTab:
                     # Get real-time threshold values from sliders
                     current_bf_conf = self.app.bf_conf_slider_value.get() / 100.0
                     current_bf_defect_thresholds = self.threshold_manager.get_bf_thresholds()
+                    current_bf_size_thresholds = self.threshold_manager.get_bf_size_thresholds()
                     
                     # Double-check model is still loaded before prediction
                     if self.preview_bf_model is None:
@@ -950,11 +1014,13 @@ class SettingsTab:
                     )
                     
                     # Filter and draw detections based on current slider values
+                    # Applies: Model Confidence Filter + Defect Confidence Filter + Size Threshold Filter
                     annotated_frame = self._filter_and_draw_detections(
                         frame, 
                         results, 
                         current_bf_conf, 
                         current_bf_defect_thresholds,
+                        current_bf_size_thresholds,
                         model_type='bf'
                     )
                     
@@ -1087,6 +1153,8 @@ class SettingsTab:
             self.threshold_snapshot = {
                 'bf_thresholds': self.threshold_manager.get_bf_thresholds(),
                 'od_thresholds': self.threshold_manager.get_od_thresholds(),
+                'bf_size_thresholds': self.threshold_manager.get_bf_size_thresholds(),
+                'od_size_thresholds': self.threshold_manager.get_od_size_thresholds(),
                 'bf_conf': self.threshold_manager.get_bf_model_confidence(),
                 'od_conf': self.threshold_manager.get_od_model_confidence()
             }
@@ -1098,7 +1166,9 @@ class SettingsTab:
                 self.threshold_snapshot['bf_thresholds'],
                 self.threshold_snapshot['od_thresholds'],
                 self.threshold_snapshot['bf_conf'],
-                self.threshold_snapshot['od_conf']
+                self.threshold_snapshot['od_conf'],
+                self.threshold_snapshot.get('bf_size_thresholds'),
+                self.threshold_snapshot.get('od_size_thresholds')
             )
     
     def _thresholds_changed(self):
@@ -1108,16 +1178,20 @@ class SettingsTab:
         
         current_bf = self.threshold_manager.get_bf_thresholds()
         current_od = self.threshold_manager.get_od_thresholds()
+        current_bf_size = self.threshold_manager.get_bf_size_thresholds()
+        current_od_size = self.threshold_manager.get_od_size_thresholds()
         current_bf_conf = self.threshold_manager.get_bf_model_confidence()
         current_od_conf = self.threshold_manager.get_od_model_confidence()
         
         # Check if any values changed
         bf_changed = current_bf != self.threshold_snapshot['bf_thresholds']
         od_changed = current_od != self.threshold_snapshot['od_thresholds']
+        bf_size_changed = current_bf_size != self.threshold_snapshot.get('bf_size_thresholds', {})
+        od_size_changed = current_od_size != self.threshold_snapshot.get('od_size_thresholds', {})
         bf_conf_changed = abs(current_bf_conf - self.threshold_snapshot['bf_conf']) > 0.001
         od_conf_changed = abs(current_od_conf - self.threshold_snapshot['od_conf']) > 0.001
         
-        return bf_changed or od_changed or bf_conf_changed or od_conf_changed
+        return bf_changed or od_changed or bf_size_changed or od_size_changed or bf_conf_changed or od_conf_changed
     
     def _block_closing(self):
         """Block app closing when preview is running."""
