@@ -11,6 +11,30 @@ class StorageChecker:
     """Static methods for storage space checking."""
     
     @staticmethod
+    def check_storage(dest_path, required_mb=100):
+        """
+        Simple storage check for a required amount in MB.
+        
+        Args:
+            dest_path: Destination folder path
+            required_mb: Required space in megabytes (default 100 MB)
+            
+        Returns:
+            bool: True if enough space available, False otherwise
+        """
+        try:
+            # Get disk usage statistics
+            disk_usage = psutil.disk_usage(dest_path)
+            available_mb = disk_usage.free / (1024 * 1024)
+            
+            # Check if sufficient space
+            return available_mb >= required_mb
+        
+        except Exception as e:
+            print(f"Error checking storage: {e}")
+            return True  # Optimistically proceed if check fails
+    
+    @staticmethod
     def check_storage_space(dest_path, required_size):
         """
         Check if destination has enough storage space.

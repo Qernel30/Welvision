@@ -41,7 +41,7 @@ class ImageBackupManager:
         """
         # Source Path Selection
         src_frame = tk.Frame(container, bg=Colors.PRIMARY_BG)
-        src_frame.pack(fill=tk.X, pady=10)
+        src_frame.pack(fill=tk.X, pady=5)
         
         src_label = tk.Label(
             src_frame,
@@ -57,8 +57,7 @@ class ImageBackupManager:
         src_entry = tk.Entry(
             src_frame,
             textvariable=self.src_path_var,
-            font=Fonts.TEXT,
-            width=40,
+            font=Fonts.SMALL,
             state='readonly'
         )
         src_entry.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
@@ -66,30 +65,32 @@ class ImageBackupManager:
         src_folder_btn = tk.Button(
             src_frame,
             text="Select Folder",
-            font=Fonts.SMALL_BOLD,
+            font=("Arial", 9, "bold"),
             bg="#4A90E2",
             fg=Colors.WHITE,
             command=self._select_source_folder,
             cursor="hand2",
-            width=12
+            width=11,
+            pady=3
         )
         src_folder_btn.pack(side=tk.LEFT, padx=2)
         
         src_files_btn = tk.Button(
             src_frame,
             text="Select Images",
-            font=Fonts.SMALL_BOLD,
+            font=("Arial", 9, "bold"),
             bg="#7B68EE",
             fg=Colors.WHITE,
             command=self._select_source_files,
             cursor="hand2",
-            width=12
+            width=11,
+            pady=3
         )
         src_files_btn.pack(side=tk.LEFT, padx=2)
         
         # Destination Path Selection
         dest_frame = tk.Frame(container, bg=Colors.PRIMARY_BG)
-        dest_frame.pack(fill=tk.X, pady=10)
+        dest_frame.pack(fill=tk.X, pady=5)
         
         dest_label = tk.Label(
             dest_frame,
@@ -105,8 +106,7 @@ class ImageBackupManager:
         dest_entry = tk.Entry(
             dest_frame,
             textvariable=self.dest_path_var,
-            font=Fonts.TEXT,
-            width=40,
+            font=Fonts.SMALL,
             state='readonly'
         )
         dest_entry.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
@@ -114,18 +114,19 @@ class ImageBackupManager:
         dest_btn = tk.Button(
             dest_frame,
             text="Select Destination",
-            font=Fonts.SMALL_BOLD,
+            font=("Arial", 9, "bold"),
             bg="#FF8C00",
             fg=Colors.WHITE,
             command=self._select_destination,
             cursor="hand2",
-            width=18
+            width=17,
+            pady=3
         )
         dest_btn.pack(side=tk.LEFT, padx=5)
         
         # Copy button
         copy_btn_frame = tk.Frame(container, bg=Colors.PRIMARY_BG)
-        copy_btn_frame.pack(pady=15)
+        copy_btn_frame.pack(pady=10)
         
         copy_btn = tk.Button(
             copy_btn_frame,
@@ -136,20 +137,20 @@ class ImageBackupManager:
             command=self.copy_images,
             cursor="hand2",
             width=25,
-            pady=10
+            pady=8
         )
         copy_btn.pack()
         
         # Info label
         info_label = tk.Label(
             container,
-            text="💡 Select source (folder or multiple images) and destination\n",
-            font=Fonts.SMALL,
+            text="💡 Select source (folder or multiple images) and destination",
+            font=("Arial", 9),
             fg="#AAAAAA",
             bg=Colors.PRIMARY_BG,
             justify=tk.CENTER
         )
-        info_label.pack(pady=10)
+        info_label.pack(pady=5)
     
     def _select_source_folder(self):
         """Select source folder containing images."""

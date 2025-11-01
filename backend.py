@@ -431,9 +431,9 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
         from frontend.utils.debug_logger import enable_debug
         enable_debug('inference')
 
-    detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\BF\\Defect\\{datetime.now().strftime('%d_%B_%Y_%H_%M')}"
+    detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\BF\\Defect"
     os.makedirs(detected_folder, exist_ok=True)
-    head_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\BF\\Head_Defect\\{datetime.now().strftime('%d_%B_%Y_%H_%M')}"
+    head_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\BF\\Head_Defect"
     os.makedirs(head_folder, exist_ok=True)
     
     bf_triggered = False
@@ -529,9 +529,9 @@ def process_rollers_bigface(shared_frame_bigface, frame_lock_bigface, roller_que
 
     allow_all = shared_data.get("allow_all", False)  
     if allow_all:
-        allow_all_folder_bf = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\BF\\All_BF\\{datetime.now().strftime('%d_%B_%Y_%H_%M')}"
+        allow_all_folder_bf = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\BF\\All_BF"
         os.makedirs(allow_all_folder_bf, exist_ok=True)
-        allow_all_folder_head = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\BF\\All_Head\\{datetime.now().strftime('%d_%B_%Y_%H_%M')}"
+        allow_all_folder_head = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\BF\\All_Head"
         os.makedirs(allow_all_folder_head, exist_ok=True) 
     
     bf_file_counter = 0
@@ -815,7 +815,7 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
         from frontend.utils.debug_logger import enable_debug
         enable_debug('inference')
 
-    detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\OD\\Defect\\{datetime.now().strftime('%d_%B_%Y_%H_%M')}"
+    detected_folder = f"C:\\Users\\{os.getlogin()}\\Desktop\\Inference\\OD\\Defect"
     os.makedirs(detected_folder, exist_ok=True)
 
     def point_inside(rectangle, list_of_all_rollers , roller_number): #COORDINATES, NO OF ROLLERS IN FRAME, TOTAL ROLLERS
@@ -876,7 +876,7 @@ def process_frames_od(shared_frame_od, frame_lock_od, roller_queue_od, model_od_
 
     allow_all = shared_data.get("allow_all", False)
     if allow_all:
-        allow_all_folder_od = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\OD\\All_OD\\{datetime.now().strftime('%d_%B_%Y_%H_%M')}"
+        allow_all_folder_od = f"C:\\Users\\{os.getlogin()}\\Desktop\\All Frames\\OD\\All_OD"
         os.makedirs(allow_all_folder_od, exist_ok=True)
 
     # Load thresholds from database
