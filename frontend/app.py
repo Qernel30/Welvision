@@ -115,6 +115,9 @@ class WelVisionApp(tk.Tk):
         self.selected_od_model_path = None
         self.selected_od_model_name = None
         
+        # Selected roller type (will persist across page navigation)
+        self.selected_roller_type = None
+        
         # Load latest models from database on startup
         self._load_latest_models_from_db()
         

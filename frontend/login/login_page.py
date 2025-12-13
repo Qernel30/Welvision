@@ -94,6 +94,18 @@ class LoginPage:
     
     def _authenticate(self):
         """Handle authentication logic."""
+        # Check if input fields still exist before trying to get credentials
+        if not self.input_fields or not hasattr(self.input_fields, 'email_entry'):
+            return
+        
+        try:
+            # Check if widgets still exist
+            if not self.input_fields.email_entry.winfo_exists():
+                return
+        except (tk.TclError, AttributeError):
+            # Widgets destroyed, abort authentication
+            return
+        
         # Get credentials and role
         email, password = self.input_fields.get_credentials()
         role = self.role_selector.role_var.get()
@@ -102,6 +114,12 @@ class LoginPage:
         success, error_message = AuthHandler.authenticate(email, password, role)
         
         if success:
+            # Unbind Enter key before cleanup to prevent double execution
+            try:
+                self.parent.unbind("<Return>")
+            except:
+                pass
+            
             # Clear the login page
             self._cleanup()
             # Call the success callback

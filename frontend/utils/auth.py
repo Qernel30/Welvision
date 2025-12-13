@@ -7,9 +7,9 @@ from ..user_management.user_database import UserDatabase
 
 # Legacy user database (kept for backward compatibility if needed)
 users = {
-    "": {"password": "", "role": "Operator"},
+    "operator": {"password": "operator123", "role": "Operator"},
     "admin": {"password": "admin123", "role": "Admin"},
-    "super": {"password": "super123", "role": "Super Admin"}
+    "": {"password": "", "role": "Super Admin"}
 }
 
 

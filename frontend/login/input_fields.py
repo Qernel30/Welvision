@@ -86,6 +86,20 @@ class InputFields:
         Returns:
             tuple: (email, password) as strings
         """
-        email = self.email_entry.get().strip() if self.email_entry else ""
-        password = self.password_entry.get().strip() if self.password_entry else ""
-        return email, password
+        try:
+            # Check if email entry exists and is valid
+            if self.email_entry and self.email_entry.winfo_exists():
+                email = self.email_entry.get().strip()
+            else:
+                email = ""
+            
+            # Check if password entry exists and is valid
+            if self.password_entry and self.password_entry.winfo_exists():
+                password = self.password_entry.get().strip()
+            else:
+                password = ""
+            
+            return email, password
+        except tk.TclError:
+            # Widgets destroyed, return empty credentials
+            return "", ""

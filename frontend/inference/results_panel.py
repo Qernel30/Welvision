@@ -141,6 +141,7 @@ class ResultsPanel:
         self._create_info_row(right_col, "Down Head (pixels):", "down_head", "No Data")
         
         # Load initial data from database
+        # Check if there's a previously selected roller type
         self._load_initial_roller_info()
     
     def _create_info_row(self, parent, label_text, var_key, default_value):
@@ -205,6 +206,15 @@ class ResultsPanel:
     def _load_initial_roller_info(self):
         """Load initial roller data from database."""
         try:
+            # First, check if there's a previously selected roller type in app
+            previously_selected = getattr(self.app, 'selected_roller_type', None)
+            
+            if previously_selected and previously_selected != "No Rollers":
+                # Load the previously selected roller's info
+                self.load_roller_from_db(previously_selected)
+                return
+            
+            # Fallback: Load first roller from database
             import mysql.connector
             
             connection = mysql.connector.connect(
@@ -216,7 +226,7 @@ class ResultsPanel:
             
             cursor = connection.cursor(dictionary=True)
             cursor.execute("""
-                SELECT outer_diameter, dimple_diameter, small_diameter, 
+                SELECT roller_type, outer_diameter, dimple_diameter, small_diameter, 
                        length_mm, high_head_pixels, down_head_pixels
                 FROM roller_data
                 ORDER BY roller_type
@@ -236,9 +246,12 @@ class ResultsPanel:
                     high_head=f"{result['high_head_pixels']} pixels",
                     down_head=f"{result['down_head_pixels']} pixels"
                 )
+                print(f"📋 Loaded first roller from DB: {result['roller_type']}")
         
         except Exception as e:
             print(f"❌ Error loading initial roller info: {e}")
+            import traceback
+            traceback.print_exc()
     
     def load_roller_from_db(self, roller_type):
         """

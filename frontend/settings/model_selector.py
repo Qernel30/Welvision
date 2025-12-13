@@ -128,8 +128,12 @@ class ModelSelector:
         return self.selector_frame
     
     def load_models_from_db(self):
-        """Load available models from database and select the latest ones."""
+        """Load available models from database and preserve current selection."""
         try:
+            # Save current selections
+            current_bf_selection = self.bf_model_var.get()
+            current_od_selection = self.od_model_var.get()
+            
             # Connect to database
             connection = mysql.connector.connect(
                 host=AppConfig.DB_HOST,
@@ -159,12 +163,22 @@ class ModelSelector:
             # Update dropdowns
             if self.bf_model_dropdown:
                 self.bf_model_dropdown['values'] = self.bf_models
-                if self.bf_models:
+                # Restore previous selection if it still exists, otherwise use app's selected model or first
+                if current_bf_selection and current_bf_selection in self.bf_models:
+                    self.bf_model_var.set(current_bf_selection)
+                elif hasattr(self.app, 'selected_bf_model_name') and self.app.selected_bf_model_name in self.bf_models:
+                    self.bf_model_var.set(self.app.selected_bf_model_name)
+                elif self.bf_models:
                     self.bf_model_var.set(self.bf_models[0])
             
             if self.od_model_dropdown:
                 self.od_model_dropdown['values'] = self.od_models
-                if self.od_models:
+                # Restore previous selection if it still exists, otherwise use app's selected model or first
+                if current_od_selection and current_od_selection in self.od_models:
+                    self.od_model_var.set(current_od_selection)
+                elif hasattr(self.app, 'selected_od_model_name') and self.app.selected_od_model_name in self.od_models:
+                    self.od_model_var.set(self.app.selected_od_model_name)
+                elif self.od_models:
                     self.od_model_var.set(self.od_models[0])
             
             # Auto-save selected models to app on load
@@ -197,9 +211,19 @@ class ModelSelector:
         }
     
     def _on_model_selected(self, event=None):
-        """Handle model selection change."""
+        """Handle model selection change and reload defect thresholds."""
+        # Save selected models to app
         self._save_selected_models_to_app()
-    
+        
+        # Get selected model names
+        bf_model_name = self.bf_model_var.get()
+        od_model_name = self.od_model_var.get()
+        
+        # Reload defect thresholds immediately for the newly selected models
+        if hasattr(self.app, 'settings_tab') and self.app.settings_tab:
+            # Use the reload method to recreate threshold sliders with new model classes
+            self.app.settings_tab.reload_defect_thresholds_for_selected_models()
+                
     def _save_selected_models_to_app(self):
         """Save selected models to app instance for use in inspection."""
         if hasattr(self.app, 'selected_bf_model_path'):

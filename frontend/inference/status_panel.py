@@ -86,10 +86,19 @@ class StatusPanel:
         # Bind selection event
         self.roller_dropdown.bind("<<ComboboxSelected>>", self._on_roller_selected)
         
-        # Set default selection if available
-        if roller_types:
+        # Check if there's a previously selected roller type in app
+        previously_selected = getattr(self.app, 'selected_roller_type', None)
+        
+        if previously_selected and previously_selected in roller_types:
+            # Restore previous selection
+            self.roller_dropdown.set(previously_selected)
+            self._load_roller_info(previously_selected)
+        elif roller_types:
+            # No previous selection - use first roller
             self.roller_dropdown.set(roller_types[0])
             self._load_roller_info(roller_types[0])
+            # Save to app
+            self.app.selected_roller_type = roller_types[0]
         
         # Block dropdown if inspection is already running
         if hasattr(self.app, 'inspection_running') and self.app.inspection_running:
@@ -129,6 +138,9 @@ class StatusPanel:
         """Handle roller selection from dropdown."""
         selected_roller = self.status_vars['roller_type'].get()
         if selected_roller and selected_roller != "No Rollers":
+            # Save to app for persistence
+            self.app.selected_roller_type = selected_roller
+            # Load roller info
             self._load_roller_info(selected_roller)
     
     def _load_roller_info(self, roller_type):
@@ -144,21 +156,28 @@ class StatusPanel:
             print(f"❌ Error loading roller info: {e}")
     
     def refresh_roller_list(self):
-        """Refresh the roller dropdown list from database."""
+        """Refresh the roller dropdown list from database and preserve selection."""
         roller_types = self._get_roller_types()
         
+        # Get current selection (from dropdown or app's saved selection)
         current_selection = self.status_vars['roller_type'].get()
+        if not current_selection or current_selection == "No Rollers":
+            current_selection = getattr(self.app, 'selected_roller_type', None)
         
         self.roller_dropdown['values'] = roller_types
         
         # Restore selection if it still exists, otherwise select first
-        if current_selection in roller_types:
+        if current_selection and current_selection in roller_types:
             self.roller_dropdown.set(current_selection)
             # Reload the roller info to get updated values
             self._load_roller_info(current_selection)
-        elif roller_types:
+            # Ensure it's saved in app
+            self.app.selected_roller_type = current_selection
+        elif roller_types and roller_types[0] != "No Rollers":
             self.roller_dropdown.set(roller_types[0])
             self._load_roller_info(roller_types[0])
+            # Save to app
+            self.app.selected_roller_type = roller_types[0]
         else:
             self.roller_dropdown.set("No Rollers")
     

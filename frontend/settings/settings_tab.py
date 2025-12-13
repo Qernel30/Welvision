@@ -248,7 +248,7 @@ class SettingsTab:
     def _load_models_and_create_thresholds(self):
         """Load selected models and create defect threshold sliders."""
         try:
-            # Get selected model paths
+            # Get selected model paths from app (persistent selection)
             bf_model_path = self.app.selected_bf_model_path
             od_model_path = self.app.selected_od_model_path
             
@@ -279,36 +279,101 @@ class SettingsTab:
                 # Load latest thresholds from database for these models
                 bf_model_name = self.app.selected_bf_model_name
                 od_model_name = self.app.selected_od_model_name
-                self._load_latest_thresholds_from_db(bf_model_name, od_model_name)
+                
+                # Only load thresholds if models are actually selected (not "No Model Available")
+                if bf_model_name and bf_model_name != "No Model Available" and od_model_name and od_model_name != "No Model Available":
+                    self._load_latest_thresholds_from_db(bf_model_name, od_model_name)
                 
             else:
                 # Show message when no models available
-                no_model_frame = tk.LabelFrame(
-                    self.scrollable_frame,
-                    text="Defect Thresholds",
-                    font=Fonts.LABEL_BOLD,
-                    fg=Colors.WHITE,
-                    bg=Colors.PRIMARY_BG,
-                    bd=2
-                )
-                no_model_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-                
-                no_model_label = tk.Label(
-                    no_model_frame,
-                    text="⚠️ No models available\n\nPlease upload BF and OD models in Model Management tab\nto configure defect thresholds.",
-                    font=Fonts.TEXT,
-                    fg="#ffff00",  # Yellow
-                    bg=Colors.PRIMARY_BG,
-                    justify=tk.CENTER,
-                    pady=30
-                )
-                no_model_label.pack(fill=tk.BOTH, expand=True)
+                self._show_no_models_message()
                 
         except Exception as e:
             print(f"⚠️ Could not load defect thresholds: {e}")
     
+    def _show_no_models_message(self):
+        """Show message when no models are available."""
+        no_model_frame = tk.LabelFrame(
+            self.scrollable_frame,
+            text="Defect Thresholds",
+            font=Fonts.LABEL_BOLD,
+            fg=Colors.WHITE,
+            bg=Colors.PRIMARY_BG,
+            bd=2
+        )
+        no_model_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        no_model_label = tk.Label(
+            no_model_frame,
+            text="⚠️ No models available\n\nPlease upload BF and OD models in Model Management tab\nto configure defect thresholds.",
+            font=Fonts.TEXT,
+            fg="#ffff00",  # Yellow
+            bg=Colors.PRIMARY_BG,
+            justify=tk.CENTER,
+            pady=30
+        )
+        no_model_label.pack(fill=tk.BOTH, expand=True)
+    
+    def reload_defect_thresholds_for_selected_models(self):
+        """Reload defect threshold sliders when models are changed."""
+        try:
+            # Clear existing slider references (the frames will be destroyed by threshold_manager)
+            self.threshold_manager.bf_threshold_sliders = {}
+            self.threshold_manager.od_threshold_sliders = {}
+            self.threshold_manager.bf_size_threshold_sliders = {}
+            self.threshold_manager.od_size_threshold_sliders = {}
+            self.threshold_manager.bf_threshold_values = {}
+            self.threshold_manager.od_threshold_values = {}
+            self.threshold_manager.bf_size_threshold_values = {}
+            self.threshold_manager.od_size_threshold_values = {}
+            
+            # Get selected model paths from app
+            bf_model_path = self.app.selected_bf_model_path
+            od_model_path = self.app.selected_od_model_path
+            
+            if bf_model_path and od_model_path:
+                # Load models temporarily to get classes
+                temp_bf_model = YOLO(bf_model_path)
+                temp_od_model = YOLO(od_model_path)
+                
+                # Create defect threshold sliders (this will destroy old container automatically)
+                self.threshold_manager.create_defect_thresholds_section(
+                    self.scrollable_frame,
+                    temp_bf_model,
+                    temp_od_model
+                )
+                
+                # Clean up temporary models
+                del temp_bf_model
+                del temp_od_model
+                
+                # Update canvas scroll region
+                def _update_scroll():
+                    try:
+                        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+                    except:
+                        pass
+                self.canvas.after(100, _update_scroll)
+                
+                # Load latest thresholds from database for these models
+                bf_model_name = self.app.selected_bf_model_name
+                od_model_name = self.app.selected_od_model_name
+                
+                # Only load thresholds if models are actually selected
+                if bf_model_name and bf_model_name != "No Model Available" and od_model_name and od_model_name != "No Model Available":
+                    self._load_latest_thresholds_from_db(bf_model_name, od_model_name)
+                
+            else:
+                # Show "no models" message
+                self._show_no_models_message()
+                
+        except Exception as e:
+            print(f"⚠️ Error reloading defect thresholds: {e}")
+            import traceback
+            traceback.print_exc()
+    
     def _load_latest_thresholds_from_db(self, bf_model_name, od_model_name):
-        """Load latest threshold values from database for the selected models."""
+        """Load latest threshold values from database for the selected models. Use defaults if not found."""
         try:
             import mysql.connector
             
@@ -341,25 +406,26 @@ class SettingsTab:
                 # Apply BF thresholds
                 for defect_name, value in bf_defects.items():
                     if defect_name in self.threshold_manager.bf_threshold_sliders:
-                        slider, label, var = self.threshold_manager.bf_threshold_sliders[defect_name]
+                        slider, entry, var = self.threshold_manager.bf_threshold_sliders[defect_name]
                         var.set(value)
-                        label.config(text=f"{int(value)}%")
+                        entry.delete(0, tk.END)
+                        entry.insert(0, str(int(value)))
                         self.threshold_manager.bf_threshold_values[defect_name] = value
                 
                 # Apply BF size thresholds
                 for defect_name, value in bf_sizes.items():
                     if defect_name in self.threshold_manager.bf_size_threshold_sliders:
-                        slider, label, var = self.threshold_manager.bf_size_threshold_sliders[defect_name]
+                        slider, entry, var = self.threshold_manager.bf_size_threshold_sliders[defect_name]
                         var.set(value)
-                        label.config(text=f"{int(value)} px²")
+                        entry.delete(0, tk.END)
+                        entry.insert(0, str(int(value)))
                         self.threshold_manager.bf_size_threshold_values[defect_name] = value
                 
                 # Apply BF model confidence
                 self.app.bf_conf_threshold = float(model_conf)
                 self.app.bf_conf_slider_value.set(float(model_conf) * 100)
-                self.threshold_manager.bf_conf_label.config(text=f"{int(float(model_conf) * 100)}%")
-                
-            
+                self.threshold_manager.bf_conf_entry.delete(0, tk.END)
+                self.threshold_manager.bf_conf_entry.insert(0, str(int(float(model_conf) * 100)))
             # Load latest OD thresholds for this model
             cursor.execute("""
                 SELECT defect_threshold, size_threshold, model_threshold 
@@ -379,24 +445,26 @@ class SettingsTab:
                 # Apply OD thresholds
                 for defect_name, value in od_defects.items():
                     if defect_name in self.threshold_manager.od_threshold_sliders:
-                        slider, label, var = self.threshold_manager.od_threshold_sliders[defect_name]
+                        slider, entry, var = self.threshold_manager.od_threshold_sliders[defect_name]
                         var.set(value)
-                        label.config(text=f"{int(value)}%")
+                        entry.delete(0, tk.END)
+                        entry.insert(0, str(int(value)))
                         self.threshold_manager.od_threshold_values[defect_name] = value
                 
                 # Apply OD size thresholds
                 for defect_name, value in od_sizes.items():
                     if defect_name in self.threshold_manager.od_size_threshold_sliders:
-                        slider, label, var = self.threshold_manager.od_size_threshold_sliders[defect_name]
+                        slider, entry, var = self.threshold_manager.od_size_threshold_sliders[defect_name]
                         var.set(value)
-                        label.config(text=f"{int(value)} px²")
+                        entry.delete(0, tk.END)
+                        entry.insert(0, str(int(value)))
                         self.threshold_manager.od_size_threshold_values[defect_name] = value
                 
                 # Apply OD model confidence
                 self.app.od_conf_threshold = float(model_conf)
                 self.app.od_conf_slider_value.set(float(model_conf) * 100)
-                self.threshold_manager.od_conf_label.config(text=f"{int(float(model_conf) * 100)}%")
-                
+                self.threshold_manager.od_conf_entry.delete(0, tk.END)
+                self.threshold_manager.od_conf_entry.insert(0, str(int(float(model_conf) * 100)))
             
             cursor.close()
             connection.close()
